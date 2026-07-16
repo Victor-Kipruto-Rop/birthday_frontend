@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>A Celebration, Just for You</title>
+<meta name="description" content="A luxurious digital birthday celebration — send a wish, send a gift, and celebrate together." />
+<meta name="theme-color" content="#0F172A" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ================= LOADER ================= -->
+<div id="loader" class="loader" role="status" aria-live="polite">
+  <div class="loader-inner">
+    <div class="loader-logo">
+      <span class="loader-logo-ring"></span>
+      <span class="loader-logo-glyph">✦</span>
+    </div>
+    <p class="loader-message">Preparing something beautiful<span class="loader-dots"><span>.</span><span>.</span><span>.</span></span></p>
+    <div class="loader-bar"><div class="loader-bar-fill" id="loaderBarFill"></div></div>
+  </div>
+</div>
+
+<!-- ================= BACKGROUND LAYERS ================= -->
+<div class="bg-scene" aria-hidden="true">
+  <div class="bg-gradient"></div>
+  <div class="bg-rays"></div>
+  <canvas id="petalsCanvas" class="petals-canvas"></canvas>
+  <div id="sparkles" class="sparkles-layer"></div>
+  <div id="hearts" class="hearts-layer"></div>
+</div>
+
+<!-- ================= MUSIC PLAYER ================= -->
+<div class="music-player" id="musicPlayer" aria-label="Background music controls">
+  <button class="music-toggle" id="musicToggle" aria-pressed="false" aria-label="Play birthday music">
+    <span class="music-icon music-icon-play">▶</span>
+    <span class="music-icon music-icon-pause">❚❚</span>
+    <span class="music-ring"></span>
+  </button>
+  <div class="music-panel" id="musicPanel">
+    <span class="music-label">Celebration Music</span>
+    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="55" aria-label="Volume">
+  </div>
+  <audio id="bgMusic" loop preload="none">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8e70c5f3e.mp3" type="audio/mpeg">
+  </audio>
+</div>
+
+<!-- ================= NAV / SCROLL PROGRESS ================= -->
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+
+<main id="main">
+
+  <!-- ================= HERO ================= -->
+  <section class="hero" id="hero">
+    <div class="hero-decor" aria-hidden="true">
+      <span class="balloon balloon-1"></span>
+      <span class="balloon balloon-2"></span>
+      <span class="balloon balloon-3"></span>
+      <span class="floating-flower flower-1">✿</span>
+      <span class="floating-flower flower-2">❀</span>
+      <span class="floating-flower flower-3">✾</span>
+    </div>
+
+    <div class="hero-content">
+      <p class="eyebrow reveal-up" data-delay="0">A DAY TOUCHED WITH GOLD</p>
+      <h1 class="hero-title">
+        <span class="reveal-up" data-delay="1">Happy Birthday,</span>
+        <span class="hero-name reveal-up" data-delay="2" id="celebrantName">Amara</span>
+      </h1>
+      <p class="hero-subtitle reveal-up" data-delay="3">
+        Every year that shapes you is a gift to everyone lucky enough to know you.
+        Today, the world gets to celebrate that.
+      </p>
+      <div class="hero-actions reveal-up" data-delay="4">
+        <a href="#wishes" class="btn btn-primary magnetic">
+          <span>Leave a Wish</span>
+        </a>
+        <a href="#gift" class="btn btn-ghost magnetic">
+          <span>Send a Gift</span>
+        </a>
+      </div>
+    </div>
+
+    <button class="scroll-indicator" id="scrollIndicator" aria-label="Scroll to explore">
+      <span class="scroll-indicator-dot"></span>
+    </button>
+  </section>
+
+  <!-- ================= COUNTDOWN ================= -->
+  <section class="countdown-section" id="countdown">
+    <p class="section-eyebrow reveal-up">THE MOMENT ARRIVES IN</p>
+    <h2 class="section-title reveal-up">Counting Down to the Celebration</h2>
+
+    <div class="countdown-grid reveal-up" id="countdownGrid" role="timer" aria-live="off">
+      <div class="countdown-card glass">
+        <span class="countdown-number" id="cd-days">00</span>
+        <span class="countdown-label">Days</span>
+      </div>
+      <div class="countdown-card glass">
+        <span class="countdown-number" id="cd-hours">00</span>
+        <span class="countdown-label">Hours</span>
+      </div>
+      <div class="countdown-card glass">
+        <span class="countdown-number" id="cd-minutes">00</span>
+        <span class="countdown-label">Minutes</span>
+      </div>
+      <div class="countdown-card glass">
+        <span class="countdown-number" id="cd-seconds">00</span>
+        <span class="countdown-label">Seconds</span>
+      </div>
+    </div>
+    <p class="countdown-caption reveal-up" id="countdownCaption">The celebration is already here — welcome!</p>
+  </section>
+
+  <!-- ================= WISHES FORM ================= -->
+  <section class="wishes-section" id="wishes">
+    <div class="section-head">
+      <p class="section-eyebrow reveal-up">WORDS, FOR HER</p>
+      <h2 class="section-title reveal-up">Leave a Birthday Wish</h2>
+      <p class="section-desc reveal-up">A few kind words go a long way. Yours will be added to the wall of love below.</p>
+    </div>
+
+    <form class="wish-form glass reveal-up" id="wishForm" novalidate>
+      <div class="field">
+        <input type="text" id="wishName" name="name" class="field-input" placeholder=" " autocomplete="name" required maxlength="60">
+        <label for="wishName" class="field-label">Full Name</label>
+        <span class="field-error" id="wishNameError"></span>
+      </div>
+
+      <div class="field">
+        <input type="tel" id="wishPhone" name="phone" class="field-input" placeholder=" " autocomplete="tel" required maxlength="15">
+        <label for="wishPhone" class="field-label">Phone Number</label>
+        <span class="field-error" id="wishPhoneError"></span>
+      </div>
+
+      <div class="field field-textarea">
+        <textarea id="wishMessage" name="message" class="field-input" placeholder=" " required maxlength="280" rows="4"></textarea>
+        <label for="wishMessage" class="field-label">Your Birthday Message</label>
+        <span class="char-counter" id="charCounter">280 characters left</span>
+        <span class="field-error" id="wishMessageError"></span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block magnetic" id="wishSubmitBtn">
+        <span class="btn-text">Send Wish</span>
+        <span class="btn-spinner" aria-hidden="true"></span>
+      </button>
+
+      <div class="form-success" id="wishSuccess" role="status">
+        <span class="success-check">✓</span>
+        <span>Your wish has been sent with love. Thank you!</span>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= GIFT / PAYMENT ================= -->
+  <section class="gift-section" id="gift">
+    <div class="section-head">
+      <p class="section-eyebrow reveal-up">A SMALL GESTURE</p>
+      <h2 class="section-title reveal-up">Send a Birthday Gift</h2>
+      <p class="section-desc reveal-up">Sent securely via M-Pesa. Every contribution adds to a beautiful day.</p>
+    </div>
+
+    <form class="gift-card glass reveal-up" id="giftForm" novalidate>
+      <div class="amount-presets" id="amountPresets">
+        <button type="button" class="amount-chip" data-amount="200">KES 200</button>
+        <button type="button" class="amount-chip" data-amount="500">KES 500</button>
+        <button type="button" class="amount-chip" data-amount="1000">KES 1,000</button>
+        <button type="button" class="amount-chip" data-amount="2000">KES 2,000</button>
+      </div>
+
+      <div class="field">
+        <input type="number" id="giftAmount" name="amount" class="field-input" placeholder=" " min="10" step="1" required>
+        <label for="giftAmount" class="field-label">Amount (KES)</label>
+        <span class="field-error" id="giftAmountError"></span>
+      </div>
+
+      <div class="field">
+        <input type="tel" id="giftPhone" name="phone" class="field-input" placeholder=" " autocomplete="tel" required maxlength="15">
+        <label for="giftPhone" class="field-label">M-Pesa Phone Number</label>
+        <span class="field-error" id="giftPhoneError"></span>
+      </div>
+
+      <button type="submit" class="btn btn-gold btn-block magnetic" id="giftSubmitBtn">
+        <span class="btn-text">Send Gift</span>
+        <span class="btn-spinner" aria-hidden="true"></span>
+      </button>
+
+      <div class="secure-badge">
+        <span class="secure-lock">🔒</span>
+        <span>Secured &amp; encrypted payment</span>
+        <span class="mpesa-badge">M-PESA</span>
+      </div>
+    </form>
+
+    <div class="payment-status" id="paymentStatus" role="status" aria-live="polite">
+      <div class="payment-status-inner">
+        <div class="payment-spinner" id="paymentSpinner"></div>
+        <span class="payment-icon" id="paymentIcon"></span>
+        <p class="payment-text" id="paymentText">Preparing payment...</p>
+        <button class="payment-close" id="paymentClose" aria-label="Close">✕</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= GALLERY ================= -->
+  <section class="gallery-section" id="gallery">
+    <div class="section-head">
+      <p class="section-eyebrow reveal-up">MOMENTS WORTH KEEPING</p>
+      <h2 class="section-title reveal-up">A Little Gallery of Joy</h2>
+    </div>
+    <div class="gallery-grid" id="galleryGrid">
+      <!-- populated by script.js -->
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image preview">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close preview">✕</button>
+    <img src="" alt="" id="lightboxImage" class="lightbox-image">
+  </div>
+
+  <!-- ================= APPRECIATION ================= -->
+  <section class="appreciation-section" id="appreciation">
+    <span class="appreciation-heart" aria-hidden="true">♥</span>
+    <h2 class="appreciation-title reveal-up">Thank You for Being You</h2>
+    <p class="appreciation-text reveal-up">
+      Thank you for the warmth you bring into every room, the quiet strength behind every kindness,
+      and the light you share without ever asking for it back. Today, we celebrate you.
+    </p>
+  </section>
+
+  <!-- ================= RECENT WISHES ================= -->
+  <section class="recent-wishes-section" id="recentWishes">
+    <div class="section-head">
+      <p class="section-eyebrow reveal-up">THE WALL OF LOVE</p>
+      <h2 class="section-title reveal-up">Recent Wishes</h2>
+    </div>
+    <div class="recent-wishes-grid" id="recentWishesGrid">
+      <!-- populated by script.js -->
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+  <div class="footer-wave" aria-hidden="true">
+    <svg viewBox="0 0 1440 100" preserveAspectRatio="none"><path d="M0,40 C360,100 1080,0 1440,60 L1440,100 L0,100 Z"></path></svg>
+  </div>
+  <div class="footer-content">
+    <p class="footer-made">Made with <span class="footer-heart">❤</span> by Victor Kipruto Rop</p>
+    <div class="footer-links">
+      <a href="https://github.com/Victor-Kipruto-Rop" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="GitHub">GitHub</a>
+      <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="LinkedIn">LinkedIn</a>
+      <a href="mailto:kiprutovictor39@gmail.com" class="footer-link" aria-label="Email">Email</a>
+    </div>
+  </div>
+  <button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>
+</footer>
+
+<div id="confettiRoot" class="confetti-root" aria-hidden="true"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

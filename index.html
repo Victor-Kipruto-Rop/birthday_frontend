@@ -7,6 +7,24 @@
 <meta name="description" content="A luxurious digital birthday celebration — send a wish, send a gift, and celebrate together." />
 <meta name="theme-color" content="#0F172A" />
 
+<!-- Favicons -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<!-- Open Graph / social preview -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Happy Birthday, Amara — A Celebration, Just for You">
+<meta property="og:description" content="Leave a birthday wish, send a gift via M-Pesa, and celebrate together.">
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Happy Birthday, Amara — A Celebration, Just for You">
+<meta name="twitter:description" content="Leave a birthday wish, send a gift via M-Pesa, and celebrate together.">
+<meta name="twitter:image" content="og-image.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -48,7 +66,7 @@
     <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="55" aria-label="Volume">
   </div>
   <audio id="bgMusic" loop preload="none">
-    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8e70c5f3e.mp3" type="audio/mpeg">
+    <source src="audio/happy-birthday.mp3" type="audio/mpeg">
   </audio>
 </div>
 
@@ -128,6 +146,12 @@
     </div>
 
     <form class="wish-form glass reveal-up" id="wishForm" novalidate>
+      <!-- Honeypot: hidden from real visitors, catches basic bots. Never remove. -->
+      <div class="hp-field" aria-hidden="true">
+        <label for="wishWebsite">Leave this field empty</label>
+        <input type="text" id="wishWebsite" name="website" tabindex="-1" autocomplete="off">
+      </div>
+
       <div class="field">
         <input type="text" id="wishName" name="name" class="field-input" placeholder=" " autocomplete="name" required maxlength="60">
         <label for="wishName" class="field-label">Full Name</label>
@@ -168,6 +192,12 @@
     </div>
 
     <form class="gift-card glass reveal-up" id="giftForm" novalidate>
+      <!-- Honeypot: hidden from real visitors, catches basic bots. Never remove. -->
+      <div class="hp-field" aria-hidden="true">
+        <label for="giftWebsite">Leave this field empty</label>
+        <input type="text" id="giftWebsite" name="website" tabindex="-1" autocomplete="off">
+      </div>
+
       <div class="amount-presets" id="amountPresets">
         <button type="button" class="amount-chip" data-amount="200">KES 200</button>
         <button type="button" class="amount-chip" data-amount="500">KES 500</button>
@@ -256,10 +286,8 @@
   </div>
   <div class="footer-content">
     <p class="footer-made">Made with <span class="footer-heart">❤</span> by Victor Kipruto Rop</p>
-    <div class="footer-links">
-      <a href="https://github.com/Victor-Kipruto-Rop" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="GitHub">GitHub</a>
-      <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="LinkedIn">LinkedIn</a>
-      <a href="mailto:kiprutovictor39@gmail.com" class="footer-link" aria-label="Email">Email</a>
+    <div class="footer-links" id="footerLinks">
+      <!-- populated by script.js from CONFIG.socialLinks -->
     </div>
   </div>
   <button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>

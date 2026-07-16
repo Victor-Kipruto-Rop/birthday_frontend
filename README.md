@@ -6,24 +6,36 @@ A luxurious, animated birthday microsite built with plain HTML, CSS, and JavaScr
 
 - Glassmorphism design in Midnight Navy, Deep Indigo, Royal Purple, Rose Pink, and Gold
 - Animated falling petals, ambient sparkles, and floating hearts (canvas + DOM, all respecting `prefers-reduced-motion`)
-- Premium loading screen with progress animation
+- Premium loading screen tied to real asset-load completion (`window.load` + `document.fonts.ready`), not a fake timer
 - Hero section with floating balloons and shimmering name treatment
 - Live countdown to the birthday with flip-style digit transitions
-- Birthday wishes form (`POST /api/wish`) with floating labels, validation, and a character counter
-- Gift/payment form (`POST /api/payment`) with M-Pesa phone validation, live status polling (`GET /api/payment-status/:id`), and confetti on success
-- Masonry gallery with lightbox preview
+- Birthday wishes form (`POST /api/wish`) with floating labels, validation, a character counter, honeypot spam-trap, and a 20-second resend cooldown
+- Gift/payment form (`POST /api/payment`) with M-Pesa phone validation, live status polling (`GET /api/payment-status/:id`), honeypot spam-trap, and confetti on success
+- Masonry gallery with lightbox preview and responsive `srcset` images
 - Recent wishes wall, populated from the backend with a graceful fallback
-- Floating music player with fade in/out, volume control, and browser-autoplay-safe behavior (starts only after a user click)
+- Floating music player with fade in/out, volume control, browser-autoplay-safe behavior (starts only after a user click), and automatic graceful degradation if the track file is missing
+- Favicon (SVG + ICO + PNG + apple-touch-icon), web manifest, and a matching 404 page
+- Open Graph / Twitter card meta tags with a generated social preview image
+- Optional, privacy-friendly, non-blocking event tracking (page views, wish/gift submissions) — off by default
 - Fully responsive, keyboard-accessible, and semantic markup throughout
 
 ## File structure
 
 ```
-index.html    Markup for every section
-style.css     Design tokens, layout, animations, responsive rules
-script.js     Interactivity, backend calls, canvas/particle effects
-README.md     This file
-vercel.json   Static hosting configuration for Vercel
+index.html            Markup for every section
+style.css              Design tokens, layout, animations, responsive rules
+script.js              Interactivity, backend calls, canvas/particle effects
+404.html               Friendly not-found page, matches the site's design
+favicon.svg            Primary favicon (modern browsers)
+favicon.ico            Multi-resolution fallback favicon (16/32/48/64px)
+favicon-16.png
+favicon-32.png
+apple-touch-icon.png    iOS home-screen icon (180x180)
+site.webmanifest        PWA/icon metadata referenced from <head>
+og-image.png            1200x630 social preview image (Open Graph / Twitter)
+audio/README.md         Instructions for sourcing the background music track
+README.md               This file
+vercel.json             Static hosting configuration for Vercel
 ```
 
 ## Customizing the celebration
@@ -42,7 +54,35 @@ const CONFIG = {
 
 To use your own photos in the gallery, replace the `src` values with your own image URLs (or local paths if you add an `/images` folder and update the links).
 
-To change the background music track, replace the `<source>` URL inside the `<audio id="bgMusic">` element in `index.html` with a track you have the rights to use.
+### Background music
+
+The player expects a file at `audio/happy-birthday.mp3`. **This file is not included** —
+see `audio/README.md` for a direct link to a free, commercially-licensed track and
+instructions for dropping it in. If the file is missing, the music button automatically
+greys itself out instead of showing a broken control.
+
+### Social links
+
+Edit `CONFIG.socialLinks` in `script.js` to point at your real GitHub, LinkedIn, and
+email. The LinkedIn URL currently has a placeholder handle (`PUT-YOUR-LINKEDIN-HANDLE-HERE`)
+that needs replacing before deploy.
+
+### Spam protection
+
+Both forms include a honeypot field (invisible to real visitors, positioned off-screen
+rather than `display:none` so basic bots that skip hidden fields still fall for it) and
+a minimum-time-on-form check. The wish form also has a 20-second client-side cooldown
+between successful submissions. None of this requires backend changes — it's purely
+front-end filtering to cut down on the most common bot traffic. It is not a substitute
+for server-side validation and rate limiting.
+
+### Analytics (optional)
+
+`CONFIG.analyticsEndpoint` is `null` by default, meaning no tracking happens. Set it to
+a backend URL to receive fire-and-forget `POST` requests shaped like
+`{ event, meta, path, ts }` for `page_view`, `wish_submitted`, `gift_initiated`,
+`gift_success`, and `gift_failed`. Failures are silently ignored so analytics can never
+break the page.
 
 ## Backend contract
 

@@ -454,6 +454,12 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
   max-width: 520px; margin: 0 auto; padding: 40px clamp(20px,4vw,44px);
   display: flex; flex-direction: column; gap: 26px;
 }
+/* Honeypot: off-screen, not display:none, so basic bots that skip hidden fields still fill it in */
+.hp-field{
+  position: absolute; left: -9999px; top: -9999px;
+  width: 1px; height: 1px; overflow: hidden;
+}
+
 .field{ position: relative; }
 .field-input{
   width: 100%; padding: 18px 16px 10px; font-size: 15px; color: var(--text-primary);

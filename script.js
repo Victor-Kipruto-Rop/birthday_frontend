@@ -7,13 +7,24 @@ const CONFIG = {
   celebrantName: 'Amara',
   birthdayISO: '2026-08-14T00:00:00', // target date/time for the countdown
   apiBaseUrl: 'https://birthday-backend-xqh2.onrender.com',
+
+  // Optional: POST { event, meta } here for lightweight, non-blocking analytics.
+  // Leave as null to disable analytics calls entirely.
+  analyticsEndpoint: null, // e.g. 'https://birthday-backend-xqh2.onrender.com/api/analytics'
+
+  socialLinks: [
+    { label: 'GitHub', href: 'https://github.com/Victor-Kipruto-Rop', external: true },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/PUT-YOUR-LINKEDIN-HANDLE-HERE', external: true },
+    { label: 'Email', href: 'mailto:kiprutovictor39@gmail.com', external: false },
+  ],
+
   galleryImages: [
-    { src: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80', alt: 'Birthday cake with lit candles' },
-    { src: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80', alt: 'Balloons and celebration decor' },
-    { src: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80', alt: 'Confetti celebration moment' },
-    { src: 'https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&q=80', alt: 'Bouquet of pink flowers' },
-    { src: 'https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80', alt: 'Golden birthday sparklers' },
-    { src: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80', alt: 'Elegant celebration table setting' },
+    { src: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80 400w, https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80 800w, https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=80 1200w', alt: 'Birthday cake with lit candles' },
+    { src: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=400&q=80 400w, https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80 800w, https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=1200&q=80 1200w', alt: 'Balloons and celebration decor' },
+    { src: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=400&q=80 400w, https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80 800w, https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=1200&q=80 1200w', alt: 'Confetti celebration moment' },
+    { src: 'https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=400&q=80 400w, https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&q=80 800w, https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=1200&q=80 1200w', alt: 'Bouquet of pink flowers' },
+    { src: 'https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=400&q=80 400w, https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80 800w, https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=1200&q=80 1200w', alt: 'Golden birthday sparklers' },
+    { src: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=400&q=80 400w, https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80 800w, https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=80 1200w', alt: 'Elegant celebration table setting' },
   ],
   fallbackRecentWishes: [
     { name: 'Faith W.', message: 'Wishing you a year as beautiful and radiant as you are. Happy birthday!', time: 'Just now' },
@@ -39,6 +50,7 @@ async function apiRequest(path, options = {}) {
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch(url, {
+      mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       ...options,
@@ -46,13 +58,42 @@ async function apiRequest(path, options = {}) {
     clearTimeout(timeout);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data?.message || `Request failed with status ${response.status}`);
+      throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
     }
     return data;
   } catch (err) {
     clearTimeout(timeout);
+    // A TypeError here almost always means CORS is blocking the request or the
+    // backend is unreachable — surface a clearer hint in the console for debugging.
+    if (err instanceof TypeError) {
+      console.warn(`Request to ${url} failed — check CORS configuration and that the backend is reachable.`, err);
+    }
     throw err;
   }
+}
+
+// Pulls the first matching key from a response object, since backend field
+// naming can vary (snake_case vs camelCase) without a confirmed contract.
+function pickField(obj, keys) {
+  if (!obj) return undefined;
+  for (const key of keys) {
+    if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+  }
+  return undefined;
+}
+
+/* ==========================================================================
+   ANALYTICS (lightweight, privacy-friendly, opt-in via CONFIG.analyticsEndpoint)
+   ========================================================================== */
+function trackEvent(event, meta = {}) {
+  if (!CONFIG.analyticsEndpoint) return;
+  // Fire-and-forget: never blocks the UI, never throws to the caller.
+  fetch(CONFIG.analyticsEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, meta, path: window.location.pathname, ts: Date.now() }),
+    keepalive: true,
+  }).catch(() => { /* analytics failures are silently ignored */ });
 }
 
 /* ==========================================================================
@@ -61,21 +102,35 @@ async function apiRequest(path, options = {}) {
 function initLoader() {
   const loader = $('#loader');
   const fill = $('#loaderBarFill');
-  let progress = 0;
-  const interval = setInterval(() => {
-    progress += Math.random() * 22;
-    if (progress >= 100) {
-      progress = 100;
-      clearInterval(interval);
-      setTimeout(() => {
-        loader.classList.add('is-hidden');
-        document.body.style.overflow = '';
-        startPostLoadAnimations();
-      }, 280);
-    }
-    fill.style.width = `${progress}%`;
-  }, 220);
+  const MIN_DISPLAY_MS = 1200;
+  const startTime = performance.now();
   document.body.style.overflow = 'hidden';
+
+  // Creep the bar toward 85% while real assets are still loading, so it never
+  // looks stalled even if the network is slow.
+  let creepProgress = 0;
+  const creepInterval = setInterval(() => {
+    creepProgress = Math.min(85, creepProgress + Math.random() * 10);
+    fill.style.width = `${creepProgress}%`;
+  }, 220);
+
+  const windowLoaded = new Promise(resolve => {
+    if (document.readyState === 'complete') resolve();
+    else window.addEventListener('load', resolve, { once: true });
+  });
+  const fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+
+  Promise.all([windowLoaded, fontsReady]).then(() => {
+    clearInterval(creepInterval);
+    const elapsed = performance.now() - startTime;
+    const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
+    fill.style.width = '100%';
+    setTimeout(() => {
+      loader.classList.add('is-hidden');
+      document.body.style.overflow = '';
+      startPostLoadAnimations();
+    }, remaining + 250);
+  });
 }
 
 function startPostLoadAnimations() {
@@ -383,6 +438,22 @@ function normalizePhone(value) {
 }
 
 /* ==========================================================================
+   SPAM PROTECTION
+   Two lightweight, no-backend-changes-required signals:
+   1. Honeypot field — real visitors never see or fill it, most bots do.
+   2. Minimum time-on-form — a submission faster than a human could type
+      is treated as automated.
+   ========================================================================== */
+const formRenderTimes = new WeakMap();
+function markFormRendered(form) { formRenderTimes.set(form, Date.now()); }
+function isLikelyBot(form, honeypotInput) {
+  if (honeypotInput && honeypotInput.value.trim() !== '') return true;
+  const renderedAt = formRenderTimes.get(form);
+  if (renderedAt && Date.now() - renderedAt < 1500) return true;
+  return false;
+}
+
+/* ==========================================================================
    WISH FORM
    ========================================================================== */
 function initWishForm() {
@@ -394,6 +465,10 @@ function initWishForm() {
   const charCounter = $('#charCounter');
   const submitBtn = $('#wishSubmitBtn');
   const successEl = $('#wishSuccess');
+  const honeypot = $('#wishWebsite');
+  markFormRendered(form);
+  let lastSubmitAt = 0;
+  const COOLDOWN_MS = 20000;
 
   messageInput.addEventListener('input', () => {
     const remaining = 280 - messageInput.value.length;
@@ -403,6 +478,18 @@ function initWishForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     successEl.classList.remove('is-visible');
+
+    if (isLikelyBot(form, honeypot)) {
+      // Pretend it worked so automated senders don't learn they were caught.
+      successEl.classList.add('is-visible');
+      form.reset();
+      return;
+    }
+
+    if (Date.now() - lastSubmitAt < COOLDOWN_MS) {
+      setFieldError('wishMessage', 'wishMessageError', 'You\u2019re sending wishes a little fast — please wait a few seconds and try again.');
+      return;
+    }
 
     let valid = true;
     if (nameInput.value.trim().length < 2) {
@@ -433,11 +520,13 @@ function initWishForm() {
 
     try {
       await apiRequest('/api/wish', { method: 'POST', body: JSON.stringify(payload) });
+      lastSubmitAt = Date.now();
       successEl.classList.add('is-visible');
       form.reset();
       charCounter.textContent = '280 characters left';
       prependRecentWish({ name: payload.name, message: payload.message, time: 'Just now' });
       launchConfetti(24);
+      trackEvent('wish_submitted');
     } catch (err) {
       setFieldError('wishMessage', 'wishMessageError', 'Could not send your wish right now — please try again shortly.');
     } finally {
@@ -457,6 +546,8 @@ function initGiftForm() {
   const phoneInput = $('#giftPhone');
   const submitBtn = $('#giftSubmitBtn');
   const chips = $$('.amount-chip');
+  const honeypot = $('#giftWebsite');
+  markFormRendered(form);
 
   chips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -472,6 +563,8 @@ function initGiftForm() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (isLikelyBot(form, honeypot)) return;
 
     let valid = true;
     const amount = Number(amountInput.value);
@@ -491,12 +584,13 @@ function initGiftForm() {
     submitBtn.disabled = true;
 
     showPaymentStatus('preparing', 'Preparing payment...');
+    trackEvent('gift_initiated', { amount });
 
     const payload = { amount, phone: normalizePhone(phoneInput.value.trim()) };
 
     try {
       const initRes = await apiRequest('/api/payment', { method: 'POST', body: JSON.stringify(payload) });
-      const transactionId = initRes?.transaction_id || initRes?.transactionId || initRes?.id;
+      const transactionId = pickField(initRes, ['transaction_id', 'transactionId', 'id', 'checkout_request_id', 'CheckoutRequestID']);
 
       showPaymentStatus('waiting', 'Waiting for confirmation on your phone...');
 
@@ -506,11 +600,13 @@ function initGiftForm() {
         // No transaction id returned — treat the initial request as sufficient confirmation.
         showPaymentStatus('success', 'Payment request sent. Thank you for your gift!');
         launchConfetti(60);
+        trackEvent('gift_success', { amount });
       }
       form.reset();
       chips.forEach(c => c.classList.remove('is-selected'));
     } catch (err) {
       showPaymentStatus('failed', 'Payment failed. Please try again.');
+      trackEvent('gift_failed', { amount });
     } finally {
       submitBtn.classList.remove('is-loading');
       submitBtn.disabled = false;
@@ -529,15 +625,21 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
   try {
     const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
-    const status = (res?.status || '').toLowerCase();
+    const rawStatus = pickField(res, ['status', 'Status', 'ResultCode', 'result_code']);
+    const status = String(rawStatus ?? '').toLowerCase();
 
-    if (status === 'success' || status === 'completed') {
+    const successStates = ['success', 'completed', 'complete', '0'];
+    const failedStates = ['failed', 'cancelled', 'canceled', 'error'];
+
+    if (successStates.includes(status)) {
       showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
+      trackEvent('gift_success');
       return;
     }
-    if (status === 'failed' || status === 'cancelled') {
+    if (failedStates.includes(status)) {
       showPaymentStatus('failed', 'Payment failed. Please try again.');
+      trackEvent('gift_failed');
       return;
     }
     await new Promise(r => setTimeout(r, INTERVAL_MS));
@@ -583,7 +685,8 @@ function initGallery() {
     const item = document.createElement('div');
     item.className = 'gallery-item';
     item.style.setProperty('--delay', i);
-    item.innerHTML = `<img src="${img.src}" alt="${img.alt}" loading="lazy">`;
+    const srcsetAttr = img.srcset ? ` srcset="${img.srcset}" sizes="(max-width: 640px) 50vw, 33vw"` : '';
+    item.innerHTML = `<img src="${img.src}"${srcsetAttr} alt="${img.alt}" loading="lazy" decoding="async">`;
     item.addEventListener('click', () => openLightbox(img.src, img.alt));
     grid.appendChild(item);
   });
@@ -655,8 +758,13 @@ async function initRecentWishes() {
     const res = await apiRequest('/api/health');
     if (res) {
       const listRes = await apiRequest('/api/wish').catch(() => null);
-      if (Array.isArray(listRes?.wishes) && listRes.wishes.length) {
-        wishes = listRes.wishes.slice(0, 9);
+      const rawList = pickField(listRes, ['wishes', 'data', 'results']) || (Array.isArray(listRes) ? listRes : null);
+      if (Array.isArray(rawList) && rawList.length) {
+        wishes = rawList.slice(0, 9).map(w => ({
+          name: pickField(w, ['name', 'full_name', 'fullName']) || 'Anonymous',
+          message: pickField(w, ['message', 'wish', 'text']) || '',
+          time: pickField(w, ['time', 'created_at', 'createdAt', 'timestamp']) || '',
+        }));
       }
     }
   } catch {
@@ -711,16 +819,51 @@ function applyPersonalization() {
   document.title = `Happy Birthday, ${CONFIG.celebrantName}`;
 }
 
+function initFooterLinks() {
+  const container = $('#footerLinks');
+  if (!container) return;
+  CONFIG.socialLinks.forEach(link => {
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.className = 'footer-link';
+    a.textContent = link.label;
+    a.setAttribute('aria-label', link.label);
+    if (link.external) {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+    container.appendChild(a);
+  });
+}
+
+/* ==========================================================================
+   AUDIO FALLBACK
+   If the configured track fails to load (e.g. the file hasn't been added
+   yet), disable the music player instead of leaving a broken control.
+   ========================================================================== */
+function initAudioFallback() {
+  const audio = $('#bgMusic');
+  const player = $('#musicPlayer');
+  if (!audio || !player) return;
+  audio.addEventListener('error', () => {
+    player.setAttribute('title', 'Music track not found — add audio/happy-birthday.mp3');
+    player.style.opacity = '0.4';
+    player.style.pointerEvents = 'none';
+  }, true);
+}
+
 /* ==========================================================================
    INIT
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
   applyPersonalization();
+  initFooterLinks();
   initLoader();
   initPetals();
   initSparkles();
   initFloatingHearts();
   initMusicPlayer();
+  initAudioFallback();
   initScrollUI();
   initCountdown();
   initMagneticButtons();
@@ -730,4 +873,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initGallery();
   initLightbox();
   initRecentWishes();
+  trackEvent('page_view');
 });

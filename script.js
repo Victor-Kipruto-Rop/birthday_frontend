@@ -18,19 +18,6 @@ const CONFIG = {
     { label: 'Email', href: 'mailto:kiprutovictor39@gmail.com', external: false },
   ],
 
-  galleryImages: [
-    { src: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80 400w, https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80 800w, https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=80 1200w', alt: 'Birthday cake with lit candles' },
-    { src: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=400&q=80 400w, https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80 800w, https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=1200&q=80 1200w', alt: 'Balloons and celebration decor' },
-    { src: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=400&q=80 400w, https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80 800w, https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=1200&q=80 1200w', alt: 'Confetti celebration moment' },
-    { src: 'https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=400&q=80 400w, https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=800&q=80 800w, https://images.unsplash.com/photo-1470753323753-3f8091bb0232?w=1200&q=80 1200w', alt: 'Bouquet of pink flowers' },
-    { src: 'https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=400&q=80 400w, https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80 800w, https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=1200&q=80 1200w', alt: 'Golden birthday sparklers' },
-    { src: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80', srcset: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=400&q=80 400w, https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&q=80 800w, https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=80 1200w', alt: 'Elegant celebration table setting' },
-  ],
-  fallbackRecentWishes: [
-    { name: 'Faith W.', message: 'Wishing you a year as beautiful and radiant as you are. Happy birthday!', time: 'Just now' },
-    { name: 'Brian K.', message: 'Cheers to another year of your incredible energy and warmth.', time: '2 hours ago' },
-    { name: 'Grace M.', message: 'May this new year of life bring you everything you have been hoping for.', time: 'Yesterday' },
-  ],
 };
 
 /* ==========================================================================
@@ -63,10 +50,33 @@ async function apiRequest(path, options = {}) {
     return data;
   } catch (err) {
     clearTimeout(timeout);
-    // A TypeError here almost always means CORS is blocking the request or the
-    // backend is unreachable — surface a clearer hint in the console for debugging.
-    if (err instanceof TypeError) {
-      console.warn(`Request to ${url} failed — check CORS configuration and that the backend is reachable.`, err);
+
+    // A TypeError here ("Failed to fetch") almost always means the backend isn't
+    // sending Access-Control-Allow-Origin on its response. In that situation the
+    // request frequently still reaches the server and gets processed and saved —
+    // the browser is just refusing to let JS read the reply, so this would otherwise
+    // surface as a false "failed" error even though the write succeeded.
+    //
+    // For non-GET requests, retry once in no-cors mode: the request still goes out
+    // and the server still processes it, we just can't read the response body. Treat
+    // that as a soft success instead of lying to the visitor about a failure.
+    const isWriteRequest = options.method && options.method.toUpperCase() !== 'GET';
+    if (err instanceof TypeError && isWriteRequest) {
+      console.warn(
+        `Request to ${url} was blocked from reading its response — this is almost always a missing CORS header on the backend, not a failed request. Retrying as fire-and-forget so the write still goes through. Fix on the backend: add Access-Control-Allow-Origin for this frontend's origin.`,
+        err
+      );
+      try {
+        await fetch(url, {
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          ...options,
+        });
+        return { __opaque: true };
+      } catch {
+        // Both attempts failed — this is a genuine connectivity/backend-down issue.
+        throw err;
+      }
     }
     throw err;
   }
@@ -142,7 +152,7 @@ function startPostLoadAnimations() {
    SCROLL REVEAL (Intersection Observer)
    ========================================================================== */
 function initRevealAnimations() {
-  const targets = $$('.reveal-up, .gallery-item, .wish-card');
+  const targets = $$('.reveal-up');
   if (!('IntersectionObserver' in window) || prefersReducedMotion) {
     targets.forEach(el => el.classList.add('is-visible'));
     return;
@@ -524,7 +534,6 @@ function initWishForm() {
       successEl.classList.add('is-visible');
       form.reset();
       charCounter.textContent = '280 characters left';
-      prependRecentWish({ name: payload.name, message: payload.message, time: 'Just now' });
       launchConfetti(24);
       trackEvent('wish_submitted');
     } catch (err) {
@@ -675,119 +684,6 @@ function initPaymentStatusClose() {
 }
 
 /* ==========================================================================
-   GALLERY
-   ========================================================================== */
-function initGallery() {
-  const grid = $('#galleryGrid');
-  if (!grid) return;
-
-  CONFIG.galleryImages.forEach((img, i) => {
-    const item = document.createElement('div');
-    item.className = 'gallery-item';
-    item.style.setProperty('--delay', i);
-    const srcsetAttr = img.srcset ? ` srcset="${img.srcset}" sizes="(max-width: 640px) 50vw, 33vw"` : '';
-    item.innerHTML = `<img src="${img.src}"${srcsetAttr} alt="${img.alt}" loading="lazy" decoding="async">`;
-    item.addEventListener('click', () => openLightbox(img.src, img.alt));
-    grid.appendChild(item);
-  });
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.1 });
-  $$('.gallery-item').forEach(el => observer.observe(el));
-}
-
-function openLightbox(src, alt) {
-  const lightbox = $('#lightbox');
-  const image = $('#lightboxImage');
-  image.src = src;
-  image.alt = alt;
-  lightbox.classList.add('is-visible');
-}
-
-function initLightbox() {
-  const lightbox = $('#lightbox');
-  $('#lightboxClose')?.addEventListener('click', () => lightbox.classList.remove('is-visible'));
-  lightbox?.addEventListener('click', (e) => {
-    if (e.target === lightbox) lightbox.classList.remove('is-visible');
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') lightbox?.classList.remove('is-visible');
-  });
-}
-
-/* ==========================================================================
-   RECENT WISHES
-   ========================================================================== */
-function renderWishCard(wish) {
-  const card = document.createElement('div');
-  card.className = 'wish-card glass';
-  card.innerHTML = `
-    <span class="wish-card-name">${escapeHTML(wish.name)}</span>
-    <p class="wish-card-message">${escapeHTML(wish.message)}</p>
-    <span class="wish-card-time">${escapeHTML(wish.time || '')}</span>
-  `;
-  return card;
-}
-
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function prependRecentWish(wish) {
-  const grid = $('#recentWishesGrid');
-  if (!grid) return;
-  const card = renderWishCard(wish);
-  grid.prepend(card);
-  requestAnimationFrame(() => card.classList.add('is-visible'));
-}
-
-async function initRecentWishes() {
-  const grid = $('#recentWishesGrid');
-  if (!grid) return;
-  let wishes = CONFIG.fallbackRecentWishes;
-
-  try {
-    const res = await apiRequest('/api/health');
-    if (res) {
-      const listRes = await apiRequest('/api/wish').catch(() => null);
-      const rawList = pickField(listRes, ['wishes', 'data', 'results']) || (Array.isArray(listRes) ? listRes : null);
-      if (Array.isArray(rawList) && rawList.length) {
-        wishes = rawList.slice(0, 9).map(w => ({
-          name: pickField(w, ['name', 'full_name', 'fullName']) || 'Anonymous',
-          message: pickField(w, ['message', 'wish', 'text']) || '',
-          time: pickField(w, ['time', 'created_at', 'createdAt', 'timestamp']) || '',
-        }));
-      }
-    }
-  } catch {
-    // Backend unreachable — fallback wishes remain in place.
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.15 });
-
-  wishes.forEach(wish => {
-    const card = renderWishCard(wish);
-    grid.appendChild(card);
-    observer.observe(card);
-  });
-}
-
-/* ==========================================================================
    CONFETTI
    ========================================================================== */
 function launchConfetti(count = 40) {
@@ -870,8 +766,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initWishForm();
   initGiftForm();
   initPaymentStatusClose();
-  initGallery();
-  initLightbox();
-  initRecentWishes();
   trackEvent('page_view');
 });

@@ -561,45 +561,6 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
 .payment-status.can-close .payment-close{ display: flex; }
 
 /* ==========================================================================
-   GALLERY
-   ========================================================================== */
-.gallery-grid{
-  columns: 3 220px; column-gap: 16px;
-}
-.gallery-item{
-  break-inside: avoid; margin-bottom: 16px; border-radius: var(--radius-md); overflow: hidden;
-  position: relative; cursor: pointer;
-  opacity: 0; transform: translateY(24px) scale(0.97);
-  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
-}
-.gallery-item.is-visible{ opacity: 1; transform: translateY(0) scale(1); }
-.gallery-item img{
-  width: 100%; display: block; transition: transform 0.6s var(--ease-out), filter 0.6s;
-}
-.gallery-item:hover img{ transform: scale(1.08); filter: brightness(1.05); }
-.gallery-item::after{
-  content:''; position: absolute; inset: 0; border-radius: var(--radius-md);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
-  opacity: 0; transition: opacity 0.4s;
-}
-.gallery-item:hover::after{ opacity: 1; box-shadow: 0 0 30px rgba(124,58,237,0.5), inset 0 0 0 1px rgba(255,255,255,0.25); }
-
-.lightbox{
-  position: fixed; inset: 0; z-index: 900; display: none; align-items: center; justify-content: center;
-  background: rgba(8,12,24,0.92); backdrop-filter: blur(10px); padding: 40px;
-}
-.lightbox.is-visible{ display: flex; animation: fade-in 0.3s var(--ease-out); }
-.lightbox-image{
-  max-width: 90vw; max-height: 85vh; border-radius: var(--radius-md);
-  box-shadow: 0 30px 90px rgba(0,0,0,0.6);
-  animation: success-pop 0.35s var(--ease-out);
-}
-.lightbox-close{
-  position: absolute; top: 26px; right: 26px; width: 40px; height: 40px; border-radius: 50%;
-  border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--white);
-}
-
-/* ==========================================================================
    APPRECIATION
    ========================================================================== */
 .appreciation-section{ text-align: center; max-width: 700px; }
@@ -618,22 +579,6 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
 }
 .appreciation-title{ font-size: clamp(26px,4vw,38px); margin-bottom: 18px; }
 .appreciation-text{ color: var(--text-secondary); font-size: 16px; line-height: 1.8; }
-
-/* ==========================================================================
-   RECENT WISHES
-   ========================================================================== */
-.recent-wishes-grid{
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px;
-}
-.wish-card{
-  padding: 24px; display: flex; flex-direction: column; gap: 10px;
-  opacity: 0; transform: translateY(20px);
-  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
-}
-.wish-card.is-visible{ opacity: 1; transform: translateY(0); }
-.wish-card-name{ font-weight: 600; font-size: 14px; color: var(--gold); }
-.wish-card-message{ font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
-.wish-card-time{ font-size: 11px; color: var(--text-muted); margin-top: auto; }
 
 /* ==========================================================================
    FOOTER
@@ -685,13 +630,11 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
 @media (max-width: 720px){
   :root{ --section-pad: 64px; }
   .countdown-grid{ gap: 10px; }
-  .gallery-grid{ columns: 2 160px; }
   .music-panel{ display: none; }
   .balloon-3{ display: none; }
 }
 @media (max-width: 480px){
   .hero-actions{ flex-direction: column; width: 100%; }
   .btn{ width: 100%; }
-  .gallery-grid{ columns: 1; }
   .amount-chip{ min-width: 80px; }
 }

@@ -6,15 +6,15 @@
 const CONFIG = {
   celebrantName: 'Amara',
   birthdayISO: '2026-08-14T00:00:00', // target date/time for the countdown
-  apiBaseUrl: 'https://birthday-backend-xqh2.onrender.com',
+  apiBaseUrl: 'https://birthday-backend-s1b7.onrender.com',
 
   // Optional: POST { event, meta } here for lightweight, non-blocking analytics.
   // Leave as null to disable analytics calls entirely.
-  analyticsEndpoint: null, // e.g. 'https://birthday-backend-xqh2.onrender.com/api/analytics'
+  analyticsEndpoint: null, // e.g. 'https://birthday-backend-s1b7.onrender.com/api/analytics'
 
   socialLinks: [
     { label: 'GitHub', href: 'https://github.com/Victor-Kipruto-Rop', external: true },
-    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/PUT-YOUR-LINKEDIN-HANDLE-HERE', external: true },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/victor-kipruto-rop', external: true },
     { label: 'Email', href: 'mailto:kiprutovictor39@gmail.com', external: false },
   ],
 
@@ -754,22 +754,9 @@ async function initRecentWishes() {
   if (!grid) return;
   let wishes = CONFIG.fallbackRecentWishes;
 
-  try {
-    const res = await apiRequest('/api/health');
-    if (res) {
-      const listRes = await apiRequest('/api/wish').catch(() => null);
-      const rawList = pickField(listRes, ['wishes', 'data', 'results']) || (Array.isArray(listRes) ? listRes : null);
-      if (Array.isArray(rawList) && rawList.length) {
-        wishes = rawList.slice(0, 9).map(w => ({
-          name: pickField(w, ['name', 'full_name', 'fullName']) || 'Anonymous',
-          message: pickField(w, ['message', 'wish', 'text']) || '',
-          time: pickField(w, ['time', 'created_at', 'createdAt', 'timestamp']) || '',
-        }));
-      }
-    }
-  } catch {
-    // Backend unreachable — fallback wishes remain in place.
-  }
+  // Note: the backend emails wishes via SMTP rather than serving them back
+  // through a public listing endpoint, so this section always uses the
+  // curated fallback wishes below rather than fetching from the API.
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {

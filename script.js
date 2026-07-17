@@ -4,7 +4,7 @@
    CONFIG — edit these values to personalize the site
    ========================================================================== */
 const CONFIG = {
-  celebrantName: 'Amara',
+  celebrantName: 'Rop',
   birthdayISO: '2026-08-14T00:00:00', // target date/time for the countdown
   apiBaseUrl: 'https://birthday-backend-xqh2.onrender.com',
 
@@ -205,7 +205,7 @@ function initPetals() {
   const ctx = canvas.getContext('2d');
   let width, height, petals = [];
   const PETAL_COUNT = window.innerWidth < 640 ? 14 : 26;
-  const colors = ['#EC4899', '#FACC15', '#7C3AED', '#F472B6', '#FDE68A'];
+  const colors = ['#00E676', '#FFB020', '#FF8800', '#6EE7B7', '#FFE29A'];
 
   function resize() {
     width = canvas.width = window.innerWidth;
@@ -689,7 +689,7 @@ function initPaymentStatusClose() {
 function launchConfetti(count = 40) {
   if (prefersReducedMotion) return;
   const root = $('#confettiRoot');
-  const colors = ['#FACC15', '#EC4899', '#7C3AED', '#FFFFFF', '#F472B6'];
+  const colors = ['#00E676', '#FFB020', '#FF8800', '#FFFFFF', '#6EE7B7'];
 
   for (let i = 0; i < count; i++) {
     const piece = document.createElement('div');

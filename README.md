@@ -4,7 +4,7 @@ A luxurious, animated birthday microsite built with plain HTML, CSS, and JavaScr
 
 ## Features
 
-- Glassmorphism design in Midnight Navy, Deep Indigo, Royal Purple, Rose Pink, and Gold
+- Glassmorphism design in Deep Onyx, Spring Green, and Orange-Yellow
 - Animated falling petals, ambient sparkles, and floating hearts (canvas + DOM, all respecting `prefers-reduced-motion`)
 - Premium loading screen tied to real asset-load completion (`window.load` + `document.fonts.ready`), not a fake timer
 - Hero section with floating balloons and shimmering name treatment
@@ -44,7 +44,7 @@ Open `script.js` and edit the `CONFIG` object near the top:
 
 ```js
 const CONFIG = {
-  celebrantName: 'Amara',                 // Shown in the hero and page title
+  celebrantName: 'Rop',                    // Shown in the hero and page title
   birthdayISO: '2026-08-14T00:00:00',     // Countdown target — use local time
   apiBaseUrl: 'https://birthday-backend-xqh2.onrender.com',
   galleryImages: [ /* { src, alt } pairs */ ],

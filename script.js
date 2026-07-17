@@ -6,15 +6,15 @@
 const CONFIG = {
   celebrantName: 'Rop',
   birthdayISO: '2026-08-14T00:00:00', // target date/time for the countdown
-  apiBaseUrl: 'https://birthday-backend-xqh2.onrender.com',
+  apiBaseUrl: 'https://birthday-backend-s1b7.onrender.com',
 
   // Optional: POST { event, meta } here for lightweight, non-blocking analytics.
   // Leave as null to disable analytics calls entirely.
-  analyticsEndpoint: null, // e.g. 'https://birthday-backend-xqh2.onrender.com/api/analytics'
+  analyticsEndpoint: null, // e.g. 'https://birthday-backend-s1b7.onrender.com/api/analytics'
 
   socialLinks: [
     { label: 'GitHub', href: 'https://github.com/Victor-Kipruto-Rop', external: true },
-    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/PUT-YOUR-LINKEDIN-HANDLE-HERE', external: true },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/victor-kipruto-rop', external: true },
     { label: 'Email', href: 'mailto:kiprutovictor39@gmail.com', external: false },
   ],
 
@@ -599,7 +599,8 @@ function initGiftForm() {
 
     try {
       const initRes = await apiRequest('/api/payment', { method: 'POST', body: JSON.stringify(payload) });
-      const transactionId = pickField(initRes, ['transaction_id', 'transactionId', 'id', 'checkout_request_id', 'CheckoutRequestID']);
+      // Response envelope is { success, message, data: { reference, phone, amount } }.
+      const transactionId = initRes?.data?.reference;
 
       showPaymentStatus('waiting', 'Waiting for confirmation on your phone...');
 
@@ -634,7 +635,8 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
   try {
     const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
-    const rawStatus = pickField(res, ['status', 'Status', 'ResultCode', 'result_code']);
+    // Response envelope is { success, message, data: { status, ... } }.
+    const rawStatus = res?.data?.status;
     const status = String(rawStatus ?? '').toLowerCase();
 
     const successStates = ['success', 'completed', 'complete', '0'];
@@ -768,3 +770,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initPaymentStatusClose();
   trackEvent('page_view');
 });
+

@@ -590,7 +590,8 @@ function initGiftForm() {
 
     try {
       const initRes = await apiRequest('/api/payment', { method: 'POST', body: JSON.stringify(payload) });
-      const transactionId = pickField(initRes, ['transaction_id', 'transactionId', 'id', 'checkout_request_id', 'CheckoutRequestID']);
+      // Response envelope is { success, message, data: { reference, phone, amount } }.
+      const transactionId = initRes?.data?.reference;
 
       showPaymentStatus('waiting', 'Waiting for confirmation on your phone...');
 
@@ -625,7 +626,8 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
   try {
     const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
-    const rawStatus = pickField(res, ['status', 'Status', 'ResultCode', 'result_code']);
+    // Response envelope is { success, message, data: { status, ... } }.
+    const rawStatus = res?.data?.status;
     const status = String(rawStatus ?? '').toLowerCase();
 
     const successStates = ['success', 'completed', 'complete', '0'];

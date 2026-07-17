@@ -754,9 +754,22 @@ async function initRecentWishes() {
   if (!grid) return;
   let wishes = CONFIG.fallbackRecentWishes;
 
-  // Note: the backend emails wishes via SMTP rather than serving them back
-  // through a public listing endpoint, so this section always uses the
-  // curated fallback wishes below rather than fetching from the API.
+  try {
+    const listRes = await apiRequest('/api/wishes').catch(() => null);
+    // Response envelope is { success, message, data: { wishes: [...] } } —
+    // unwrap `data` first, then pull the array out of it.
+    const payload = listRes && typeof listRes === 'object' && 'data' in listRes ? listRes.data : listRes;
+    const rawList = pickField(payload, ['wishes', 'results']) || (Array.isArray(payload) ? payload : null);
+    if (Array.isArray(rawList) && rawList.length) {
+      wishes = rawList.slice(0, 9).map(w => ({
+        name: pickField(w, ['name', 'full_name', 'fullName']) || 'Anonymous',
+        message: pickField(w, ['message', 'wish', 'text']) || '',
+        time: pickField(w, ['time', 'created_at', 'createdAt', 'timestamp']) || '',
+      }));
+    }
+  } catch {
+    // Backend unreachable — fallback wishes remain in place.
+  }
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -862,3 +875,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecentWishes();
   trackEvent('page_view');
 });
+

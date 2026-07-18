@@ -53,34 +53,6 @@ async function apiRequest(path, options = {}) {
     return data;
   } catch (err) {
     clearTimeout(timeout);
-
-    // A TypeError here ("Failed to fetch") almost always means the backend isn't
-    // sending Access-Control-Allow-Origin on its response. In that situation the
-    // request frequently still reaches the server and gets processed and saved —
-    // the browser is just refusing to let JS read the reply, so this would otherwise
-    // surface as a false "failed" error even though the write succeeded.
-    //
-    // For non-GET requests, retry once in no-cors mode: the request still goes out
-    // and the server still processes it, we just can't read the response body. Treat
-    // that as a soft success instead of lying to the visitor about a failure.
-    const isWriteRequest = options.method && options.method.toUpperCase() !== 'GET';
-    if (err instanceof TypeError && isWriteRequest) {
-      console.warn(
-        `Request to ${url} was blocked from reading its response — this is almost always a missing CORS header on the backend, not a failed request. Retrying as fire-and-forget so the write still goes through. Fix on the backend: add Access-Control-Allow-Origin for this frontend's origin.`,
-        err
-      );
-      try {
-        await fetch(url, {
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          ...options,
-        });
-        return { __opaque: true };
-      } catch {
-        // Both attempts failed — this is a genuine connectivity/backend-down issue.
-        throw err;
-      }
-    }
     throw err;
   }
 }

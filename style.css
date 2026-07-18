@@ -349,9 +349,9 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
    ========================================================================== */
 .hero{
   min-height: 100vh;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   text-align: center; position: relative;
-  padding-top: 100px;
+  padding: 56px 20px 64px;
 }
 .hero-decor{ position: absolute; inset: 0; overflow: hidden; }
 .balloon{
@@ -390,6 +390,7 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
 .hero-avatar{
   width: 140px; height: 140px; border-radius: 50%;
   object-fit: cover;
+  object-position: center 5%;
   border: 3px solid var(--glass-border);
   box-shadow: 0 0 0 6px rgba(0,230,118,0.12), 0 20px 50px rgba(0,0,0,0.5);
   animation: avatar-glow 4s ease-in-out infinite;
@@ -432,11 +433,10 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
 .hero-actions{ margin-top: 40px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 
 .scroll-indicator{
-  position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+  margin: 48px auto 0;
   width: 26px; height: 42px; border-radius: var(--radius-full);
   border: 1.5px solid rgba(255,255,255,0.35);
   background: transparent; display: flex; justify-content: center; padding-top: 8px;
-  z-index: 2;
 }
 .scroll-indicator-dot{
   width: 4px; height: 8px; border-radius: var(--radius-full); background: var(--amber);

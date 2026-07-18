@@ -454,89 +454,6 @@ function isLikelyBot(form, honeypotInput) {
 }
 
 /* ==========================================================================
-   WISH FORM
-   ========================================================================== */
-function initWishForm() {
-  const form = $('#wishForm');
-  if (!form) return;
-  const nameInput = $('#wishName');
-  const phoneInput = $('#wishPhone');
-  const messageInput = $('#wishMessage');
-  const charCounter = $('#charCounter');
-  const submitBtn = $('#wishSubmitBtn');
-  const successEl = $('#wishSuccess');
-  const honeypot = $('#wishWebsite');
-  markFormRendered(form);
-  let lastSubmitAt = 0;
-  const COOLDOWN_MS = 20000;
-
-  messageInput.addEventListener('input', () => {
-    const remaining = 280 - messageInput.value.length;
-    charCounter.textContent = `${remaining} characters left`;
-  });
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    successEl.classList.remove('is-visible');
-
-    if (isLikelyBot(form, honeypot)) {
-      // Pretend it worked so automated senders don't learn they were caught.
-      successEl.classList.add('is-visible');
-      form.reset();
-      return;
-    }
-
-    if (Date.now() - lastSubmitAt < COOLDOWN_MS) {
-      setFieldError('wishMessage', 'wishMessageError', 'You\u2019re sending wishes a little fast — please wait a few seconds and try again.');
-      return;
-    }
-
-    let valid = true;
-    if (nameInput.value.trim().length < 2) {
-      setFieldError('wishName', 'wishNameError', 'Please enter your full name.');
-      valid = false;
-    } else setFieldError('wishName', 'wishNameError', '');
-
-    if (!isValidPhone(phoneInput.value.trim())) {
-      setFieldError('wishPhone', 'wishPhoneError', 'Enter a valid Kenyan phone number.');
-      valid = false;
-    } else setFieldError('wishPhone', 'wishPhoneError', '');
-
-    if (messageInput.value.trim().length < 3) {
-      setFieldError('wishMessage', 'wishMessageError', 'Say a few kind words for the celebration.');
-      valid = false;
-    } else setFieldError('wishMessage', 'wishMessageError', '');
-
-    if (!valid) return;
-
-    submitBtn.classList.add('is-loading');
-    submitBtn.disabled = true;
-
-    const payload = {
-      name: nameInput.value.trim(),
-      phone: normalizePhone(phoneInput.value.trim()),
-      message: messageInput.value.trim(),
-    };
-
-    try {
-      await apiRequest('/api/wish', { method: 'POST', body: JSON.stringify(payload) });
-      lastSubmitAt = Date.now();
-      successEl.classList.add('is-visible');
-      form.reset();
-      charCounter.textContent = '280 characters left';
-      launchConfetti(24);
-      trackEvent('wish_submitted');
-    } catch (err) {
-      console.error('Wish submission failed:', err);
-      setFieldError('wishMessage', 'wishMessageError', describeRequestError(err));
-    } finally {
-      submitBtn.classList.remove('is-loading');
-      submitBtn.disabled = false;
-    }
-  });
-}
-
-/* ==========================================================================
    GIFT / PAYMENT FORM
    ========================================================================== */
 function initGiftForm() {
@@ -770,7 +687,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollUI();
   initCountdown();
   initMagneticButtons();
-  initWishForm();
   initGiftForm();
   initPaymentStatusClose();
   warmUpBackend();

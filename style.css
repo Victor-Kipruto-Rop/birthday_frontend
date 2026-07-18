@@ -477,7 +477,7 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
 /* ==========================================================================
    FORMS (shared field styling)
    ========================================================================== */
-.wish-form, .gift-card{
+.gift-card{
   max-width: 520px; margin: 0 auto; padding: 40px clamp(20px,4vw,44px);
   display: flex; flex-direction: column; gap: 26px;
 }
@@ -510,25 +510,10 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
   transition: opacity 0.25s;
 }
 .field.has-error .field-error{ opacity: 1; }
-.char-counter{
-  position: absolute; right: 4px; bottom: -20px; font-size: 11px; color: var(--text-muted);
-}
 
-.form-success{
-  display: none; align-items: center; gap: 10px; justify-content: center;
-  padding: 14px; border-radius: var(--radius-sm);
-  background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.35);
-  color: #86EFAC; font-size: 14px;
-  animation: success-pop 0.5s var(--ease-out);
-}
-.form-success.is-visible{ display: flex; }
 @keyframes success-pop{
   0%{ transform: scale(0.9); opacity: 0; }
   100%{ transform: scale(1); opacity: 1; }
-}
-.success-check{
-  width: 22px; height: 22px; border-radius: 50%; background: #22C55E; color: var(--onyx-deep);
-  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;
 }
 
 /* ==========================================================================

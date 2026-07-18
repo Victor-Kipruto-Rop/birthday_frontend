@@ -67,19 +67,23 @@ function pickField(obj, keys) {
   return undefined;
 }
 
-// Turns a thrown error into a message that actually reflects what happened,
-// instead of always showing the same generic "something went wrong" line.
+// Turns a thrown error into a message that's safe to show a visitor.
+// Network-level failures (timeout, unreachable, CORS, DNS, etc.) never reveal
+// what actually went wrong — that's noise or confusing to a non-technical
+// visitor, and "the server is unreachable" is not something they can act on
+// anyway. Real validation errors from the backend (e.g. "invalid phone
+// number") still come through as-is since those ARE actionable.
 function describeRequestError(err) {
   if (err && err.name === 'AbortError') {
-    return 'The server is still waking up (this can take up to a minute on its first request of the day) — please try again in a moment.';
+    return 'Something went wrong. Please try again later.';
   }
   if (err instanceof TypeError) {
-    return 'Could not reach the server — please check your connection and try again.';
+    return 'Something went wrong. Please try again later.';
   }
   if (err && err.message) {
     return err.message;
   }
-  return 'Something went wrong — please try again shortly.';
+  return 'Something went wrong. Please try again later.';
 }
 
 /* ==========================================================================
@@ -466,6 +470,11 @@ function initGiftForm() {
   const honeypot = $('#giftWebsite');
   markFormRendered(form);
 
+  // Second chance to warm the backend: if the page-load ping happened to
+  // fail (or the visitor waited a long time before interacting), this
+  // gives it another shot well before the real submission.
+  form.addEventListener('focusin', warmUpBackend, { once: true });
+
   chips.forEach(chip => {
     chip.addEventListener('click', () => {
       chips.forEach(c => c.classList.remove('is-selected'));
@@ -505,8 +514,17 @@ function initGiftForm() {
 
     const payload = { amount, phone: normalizePhone(phoneInput.value.trim()) };
 
+    // If the initial request takes a while (cold backend, slow network),
+    // update the message instead of leaving a static line up for up to 45s
+    // with no sign anything is happening — that stillness is what reads as
+    // "frozen" or "slow" even when the request is actually progressing fine.
+    const slowHint = setTimeout(() => {
+      showPaymentStatus('preparing', 'Still preparing your payment — almost there...');
+    }, 6000);
+
     try {
       const initRes = await apiRequest('/api/payment', { method: 'POST', body: JSON.stringify(payload) });
+      clearTimeout(slowHint);
       // Response envelope is { success, message, data: { reference, phone, amount } }.
       const transactionId = initRes?.data?.reference;
 
@@ -523,6 +541,7 @@ function initGiftForm() {
       form.reset();
       chips.forEach(c => c.classList.remove('is-selected'));
     } catch (err) {
+      clearTimeout(slowHint);
       console.error('Payment initiation failed:', err);
       showPaymentStatus('failed', describeRequestError(err));
       trackEvent('gift_failed', { amount });
@@ -533,6 +552,17 @@ function initGiftForm() {
   });
 }
 
+// Rotates the "waiting for confirmation" message as polling goes on, so a
+// visitor sees continuous signs of progress during what can legitimately be
+// up to a minute of waiting for an M-Pesa STK push to be answered, instead
+// of one static line that makes the whole thing look stuck.
+function waitingMessageFor(attempts) {
+  if (attempts < 3) return 'Waiting for confirmation on your phone...';
+  if (attempts < 7) return 'Still waiting — check your phone for the M-Pesa prompt.';
+  if (attempts < 13) return 'This can take a little longer sometimes — hang tight.';
+  return 'Still working on it — thanks for your patience.';
+}
+
 async function pollPaymentStatus(transactionId, attempts = 0) {
   const MAX_ATTEMPTS = 20;
   const INTERVAL_MS = 3000;
@@ -541,6 +571,8 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     showPaymentStatus('failed', 'We could not confirm this payment in time. Check your phone or try again.');
     return;
   }
+
+  showPaymentStatus('waiting', waitingMessageFor(attempts));
 
   try {
     const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
@@ -665,10 +697,14 @@ function initAudioFallback() {
    soon as the page loads (well before anyone finishes filling out a form)
    so the real submission doesn't eat a 30–50s cold-start delay.
    ========================================================================== */
+let backendWarmed = false;
 function warmUpBackend() {
+  if (backendWarmed) return;
+  backendWarmed = true;
   apiRequest('/api/health').catch(() => {
     // Ignore — this is best-effort. If it fails, the real request will
     // still work, just with the usual cold-start wait built into its timeout.
+    backendWarmed = false; // allow a retry on the next trigger
   });
 }
 

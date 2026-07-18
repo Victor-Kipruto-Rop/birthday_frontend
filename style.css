@@ -565,6 +565,15 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
 .payment-status.state-success .payment-icon{ display: block; }
 .payment-status.state-failed .payment-spinner{ display: none; }
 .payment-status.state-failed .payment-icon{ display: block; }
+.payment-status.state-pending .payment-spinner{ display: none; }
+.payment-status.state-pending .payment-icon{ display: block; }
+.payment-recheck{
+  display: none;
+  margin-top: 18px;
+  padding: 10px 22px;
+  font-size: 13px;
+}
+.payment-status.can-recheck .payment-recheck{ display: inline-flex; }
 .payment-close{
   position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 50%;
   border: 1px solid var(--glass-border); background: transparent; color: var(--text-muted);

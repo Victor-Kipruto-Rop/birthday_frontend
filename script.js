@@ -563,12 +563,24 @@ function waitingMessageFor(attempts) {
   return 'Still working on it — thanks for your patience.';
 }
 
+// Tracks the transaction currently being polled so the manual "Check again"
+// button can re-check it on demand after the automatic window gives up.
+let lastPolledTransactionId = null;
+
 async function pollPaymentStatus(transactionId, attempts = 0) {
-  const MAX_ATTEMPTS = 20;
+  // ~3 minutes total (3s * 60). M-Pesa STK confirmations are usually fast,
+  // but a visitor who hesitates on the prompt can genuinely take a while —
+  // and declaring "failed" after giving up early on a payment that then
+  // succeeds seconds later is worse than a longer wait.
+  const MAX_ATTEMPTS = 60;
   const INTERVAL_MS = 3000;
+  lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {
-    showPaymentStatus('failed', 'We could not confirm this payment in time. Check your phone or try again.');
+    // Genuinely unknown at this point — NOT a failure. The payment may still
+    // complete on M-Pesa's side; we just stopped auto-checking. Let the
+    // visitor manually check again instead of telling them it failed.
+    showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly — tap \u201cCheck again\u201d in a moment.");
     return;
   }
 
@@ -602,12 +614,45 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
   }
 }
 
+// One-off check for the manual "Check again" button — does not restart the
+// full automatic polling loop, just asks once and reflects whatever comes
+// back, including "still pending" so the visitor can check again later.
+async function recheckPaymentStatus() {
+  if (!lastPolledTransactionId) return;
+  const recheckBtn = $('#paymentRecheck');
+  recheckBtn.disabled = true;
+  showPaymentStatus('waiting', 'Checking...');
+
+  try {
+    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`);
+    const rawStatus = res?.data?.status;
+    const status = String(rawStatus ?? '').toLowerCase();
+    const successStates = ['success', 'completed', 'complete', '0'];
+    const failedStates = ['failed', 'cancelled', 'canceled', 'error'];
+
+    if (successStates.includes(status)) {
+      showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
+      launchConfetti(60);
+      trackEvent('gift_success');
+    } else if (failedStates.includes(status)) {
+      showPaymentStatus('failed', 'Payment failed. Please try again.');
+      trackEvent('gift_failed');
+    } else {
+      showPaymentStatus('pending', "Still processing — no confirmation yet. You're welcome to check again in a moment.");
+    }
+  } catch {
+    showPaymentStatus('pending', "Couldn't check just now — please try again in a moment.");
+  } finally {
+    recheckBtn.disabled = false;
+  }
+}
+
 function showPaymentStatus(state, message) {
   const statusEl = $('#paymentStatus');
   const textEl = $('#paymentText');
   const iconEl = $('#paymentIcon');
 
-  statusEl.classList.remove('state-success', 'state-failed', 'can-close');
+  statusEl.classList.remove('state-success', 'state-failed', 'state-pending', 'can-close', 'can-recheck');
   statusEl.classList.add('is-visible');
   textEl.textContent = message;
 
@@ -617,7 +662,14 @@ function showPaymentStatus(state, message) {
   } else if (state === 'failed') {
     statusEl.classList.add('state-failed', 'can-close');
     iconEl.textContent = '✕';
+  } else if (state === 'pending') {
+    statusEl.classList.add('state-pending', 'can-close', 'can-recheck');
+    iconEl.textContent = '⏳';
   }
+}
+
+function initPaymentRecheck() {
+  $('#paymentRecheck')?.addEventListener('click', recheckPaymentStatus);
 }
 
 function initPaymentStatusClose() {
@@ -725,6 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMagneticButtons();
   initGiftForm();
   initPaymentStatusClose();
+  initPaymentRecheck();
   warmUpBackend();
   trackEvent('page_view');
 });

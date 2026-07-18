@@ -26,6 +26,11 @@
             --muted:#a8b3cf;
         }
 
+        html{
+            overflow-x:hidden;
+            width:100%;
+        }
+
         body{
             font-family:Inter,Segoe UI,Arial,sans-serif;
             background:
@@ -33,12 +38,14 @@
                 radial-gradient(circle at bottom left,#00d4ff18,transparent 30%),
                 var(--bg);
             color:var(--text);
+            width:100%;
             min-height:100vh;
+            min-height:100dvh; /* accounts for mobile browser chrome (address bar), avoids content looking cut off */
             display:flex;
             align-items:center;
             justify-content:center;
             padding:25px;
-            overflow:hidden;
+            overflow-x:hidden;
         }
 
         body::before{
@@ -212,6 +219,40 @@
 
             .subtitle{
                 font-size:1rem;
+            }
+
+        }
+
+        @media(max-width:380px){
+
+            .card{
+                padding:28px 18px;
+            }
+
+            .grid{
+                grid-template-columns:1fr;
+            }
+
+            .buttons{
+                flex-direction:column;
+            }
+
+            .btn{
+                width:100%;
+                text-align:center;
+            }
+
+        }
+
+        /* Short viewports (landscape phones, small browser windows): centering a
+           tall card vertically can push its top above the fold with no visible
+           cue that there's more above. Align to the top instead so the page
+           always starts readable and scrolls naturally from there. */
+        @media(max-height:600px){
+
+            body{
+                align-items:flex-start;
+                padding-top:40px;
             }
 
         }

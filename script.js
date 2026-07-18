@@ -34,7 +34,10 @@ function safeJSONParse(text) {
 async function apiRequest(path, options = {}) {
   const url = `${CONFIG.apiBaseUrl}${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  // Render's free tier spins down idle services; the first request after a
+  // period of inactivity can take 30–50s to cold-start. 15s was too tight
+  // and made every "first" submission look like a failure.
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch(url, {
       mode: 'cors',
@@ -90,6 +93,21 @@ function pickField(obj, keys) {
     if (obj[key] !== undefined && obj[key] !== null) return obj[key];
   }
   return undefined;
+}
+
+// Turns a thrown error into a message that actually reflects what happened,
+// instead of always showing the same generic "something went wrong" line.
+function describeRequestError(err) {
+  if (err && err.name === 'AbortError') {
+    return 'The server is still waking up (this can take up to a minute on its first request of the day) — please try again in a moment.';
+  }
+  if (err instanceof TypeError) {
+    return 'Could not reach the server — please check your connection and try again.';
+  }
+  if (err && err.message) {
+    return err.message;
+  }
+  return 'Something went wrong — please try again shortly.';
 }
 
 /* ==========================================================================
@@ -537,7 +555,8 @@ function initWishForm() {
       launchConfetti(24);
       trackEvent('wish_submitted');
     } catch (err) {
-      setFieldError('wishMessage', 'wishMessageError', 'Could not send your wish right now — please try again shortly.');
+      console.error('Wish submission failed:', err);
+      setFieldError('wishMessage', 'wishMessageError', describeRequestError(err));
     } finally {
       submitBtn.classList.remove('is-loading');
       submitBtn.disabled = false;
@@ -615,7 +634,8 @@ function initGiftForm() {
       form.reset();
       chips.forEach(c => c.classList.remove('is-selected'));
     } catch (err) {
-      showPaymentStatus('failed', 'Payment failed. Please try again.');
+      console.error('Payment initiation failed:', err);
+      showPaymentStatus('failed', describeRequestError(err));
       trackEvent('gift_failed', { amount });
     } finally {
       submitBtn.classList.remove('is-loading');
@@ -751,6 +771,19 @@ function initAudioFallback() {
 }
 
 /* ==========================================================================
+   BACKEND WARM-UP
+   Render's free tier spins the backend down after inactivity. Ping it as
+   soon as the page loads (well before anyone finishes filling out a form)
+   so the real submission doesn't eat a 30–50s cold-start delay.
+   ========================================================================== */
+function warmUpBackend() {
+  apiRequest('/api/health').catch(() => {
+    // Ignore — this is best-effort. If it fails, the real request will
+    // still work, just with the usual cold-start wait built into its timeout.
+  });
+}
+
+/* ==========================================================================
    INIT
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -768,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initWishForm();
   initGiftForm();
   initPaymentStatusClose();
+  warmUpBackend();
   trackEvent('page_view');
 });
 

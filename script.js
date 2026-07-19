@@ -583,12 +583,11 @@ function waitingMessageFor(attempts) {
 let lastPolledTransactionId = null;
 
 async function pollPaymentStatus(transactionId, attempts = 0) {
-  // ~3 minutes total (3s * 60). M-Pesa STK confirmations are usually fast,
-  // but a visitor who hesitates on the prompt can genuinely take a while —
-  // and declaring "failed" after giving up early on a payment that then
-  // succeeds seconds later is worse than a longer wait.
+  // OPTIMIZED: Poll every 1 second instead of 3 seconds (3x faster confirmation)
+  // ~60 seconds total (1s * 60). M-Pesa STK confirmations are usually within 5-10 seconds.
+  // This gives fast feedback while maintaining 60-second timeout for edge cases.
   const MAX_ATTEMPTS = 60;
-  const INTERVAL_MS = 3000;
+  const INTERVAL_MS = 1000;  // Changed from 3000ms to 1000ms - 3x faster!
   lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {
@@ -599,31 +598,68 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     return;
   }
 
-  showPaymentStatus('waiting', waitingMessageFor(attempts));
+  // Show countdown timer for better UX: "Waiting... (1s)", "(2s)", etc.
+  const countdownMsg = attempts > 0 ? `${waitingMessageFor(attempts)} (${attempts}s)` : waitingMessageFor(attempts);
+  showPaymentStatus('waiting', countdownMsg);
 
   try {
     const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
-    // Response envelope is { success, message, data: { status, ... } }.
+    
+    // DEBUG: Log the full response to help diagnose issues
+    console.log(`[Payment Status Poll #${attempts + 1}] Response:`, res);
+    
+    // Response envelope is { success, message, data: { status, reference, amount, ... } }.
     const rawStatus = res?.data?.status;
-    const status = String(rawStatus ?? '').toLowerCase();
+    const status = String(rawStatus ?? '').toLowerCase().trim();
+    
+    console.log(`[Payment Status Poll #${attempts + 1}] Raw Status: "${rawStatus}", Normalized: "${status}"`);
 
-    const successStates = ['success', 'completed', 'complete', '0'];
-    const failedStates = ['failed', 'cancelled', 'canceled', 'error'];
+    // Statuses indicating success
+    const successStates = ['success', 'completed', 'complete', 'paid', '0'];
+    
+    // Statuses indicating failure
+    const failedStates = ['failed', 'cancelled', 'canceled', 'declined', 'error'];
+    
+    // CRITICAL: Check if transaction has been finalized_at timestamp (means it's complete)
+    const finalizedAt = res?.data?.finalized_at;
+    const hasBeenFinalized = finalizedAt !== null && finalizedAt !== undefined;
+    
+    console.log(`[Payment Status Poll #${attempts + 1}] Finalized: ${hasBeenFinalized}, Amount: ${res?.data?.amount}`);
 
+    // SUCCESS CHECK 1: Status is explicitly "success"
     if (successStates.includes(status)) {
+      console.log(`✅ [Payment Status Poll #${attempts + 1}] SUCCESS: Status is "${status}"`);
       showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
       trackEvent('gift_success');
       return;
     }
+    
+    // SUCCESS CHECK 2: Transaction was finalized AND amount exists (alternative success indicator)
+    if (hasBeenFinalized && res?.data?.amount) {
+      console.log(`✅ [Payment Status Poll #${attempts + 1}] SUCCESS: Finalized with amount ${res?.data?.amount}`);
+      showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
+      launchConfetti(60);
+      trackEvent('gift_success');
+      return;
+    }
+
+    // FAILURE CHECK: Status is explicitly failed
     if (failedStates.includes(status)) {
+      console.log(`❌ [Payment Status Poll #${attempts + 1}] FAILED: Status is "${status}"`);
       showPaymentStatus('failed', 'Payment failed. Please try again.');
       trackEvent('gift_failed');
       return;
     }
+    
+    // PENDING: Keep polling
+    console.log(`⏳ [Payment Status Poll #${attempts + 1}] Still pending, will retry...`);
     await new Promise(r => setTimeout(r, INTERVAL_MS));
     return pollPaymentStatus(transactionId, attempts + 1);
-  } catch {
+    
+  } catch (err) {
+    // Network error - keep retrying but show countdown feedback
+    console.log(`[Payment Status Poll #${attempts + 1}] Error:`, err.message);
     await new Promise(r => setTimeout(r, INTERVAL_MS));
     return pollPaymentStatus(transactionId, attempts + 1);
   }

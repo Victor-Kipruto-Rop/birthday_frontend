@@ -36,14 +36,19 @@ async function apiRequest(path, options = {}) {
   const controller = new AbortController();
   // Render's free tier spins down idle services; the first request after a
   // period of inactivity can take 30–50s to cold-start. 15s was too tight
-  // and made every "first" submission look like a failure.
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  // and made every "first" submission look like a failure. Individual
+  // callers can override this via options.timeoutMs where a shorter,
+  // more specific limit makes sense (e.g. "sending the prompt" is capped
+  // at 30s so a stuck request fails fast instead of leaving the visitor
+  // staring at a spinner for the full 45s).
+  const { timeoutMs = 45000, ...fetchOptions } = options;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
     });
     clearTimeout(timeout);
     const data = await response.json().catch(() => ({}));
@@ -523,7 +528,14 @@ function initGiftForm() {
     }, 6000);
 
     try {
-      const initRes = await apiRequest('/api/payment', { method: 'POST', body: JSON.stringify(payload) });
+      // Capped at 30s specifically for sending the M-Pesa prompt: if it
+      // hasn't gone out by then, fail fast and let the visitor retry
+      // rather than leaving them staring at a spinner indefinitely.
+      const initRes = await apiRequest('/api/payment', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        timeoutMs: 30000,
+      });
       clearTimeout(slowHint);
       // Response envelope is { success, message, data: { reference, phone, amount } }.
       const transactionId = initRes?.data?.reference;
@@ -543,7 +555,10 @@ function initGiftForm() {
     } catch (err) {
       clearTimeout(slowHint);
       console.error('Payment initiation failed:', err);
-      showPaymentStatus('failed', describeRequestError(err));
+      const message = err?.name === 'AbortError'
+        ? 'Sending the M-Pesa prompt timed out. Please try again.'
+        : describeRequestError(err);
+      showPaymentStatus('failed', message);
       trackEvent('gift_failed', { amount });
     } finally {
       submitBtn.classList.remove('is-loading');

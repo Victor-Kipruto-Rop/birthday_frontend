@@ -573,6 +573,7 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
   // This gives fast feedback while maintaining 60-second timeout for edge cases.
   const MAX_ATTEMPTS = 60;
   const INTERVAL_MS = 1000;  // Changed from 3000ms to 1000ms - 3x faster!
+  const TIMEOUT_WARNING_ATTEMPTS = 30;  // Warn user after 30 seconds
   lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {
@@ -581,6 +582,20 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     // visitor manually check again instead of telling them it failed.
     showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly — tap \u201cCheck again\u201d in a moment.");
     return;
+  }
+
+  // TIMEOUT WARNING: After 30 seconds, tell user to try again
+  if (attempts === TIMEOUT_WARNING_ATTEMPTS) {
+    logger.info("⏱️  [Payment Status Poll #%d] 30-second timeout reached - showing timeout message", attempts + 1);
+    showPaymentStatus('timeout', 
+      "This is taking longer than expected. Your payment may have timed out or been declined. " +
+      "Please check your phone for an M-Pesa notification, then try again with a new payment request. " +
+      "If your payment was successful, it will still be processed."
+    );
+    
+    // Continue polling for another 30 seconds in case it completes
+    await new Promise(r => setTimeout(r, INTERVAL_MS));
+    return pollPaymentStatus(transactionId, attempts + 1);
   }
 
   // Show countdown timer for better UX: "Waiting... (1s)", "(2s)", etc.

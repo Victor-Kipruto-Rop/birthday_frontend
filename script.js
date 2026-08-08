@@ -780,11 +780,13 @@ function interpretPaymentStatus(res, pollLabel) {
     ?? statusData.PaymentStatus
     ?? statusData.provider_status;
   const status = String(rawStatus ?? '').toLowerCase().trim();
+  const reason = String(statusData.reason ?? '').toLowerCase().trim();
   if (pollLabel) console.log(`[${pollLabel}] Raw Status: "${rawStatus}", Normalized: "${status}"`);
 
   const successStates = ['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'];
   const failedStates = ['failed', 'cancelled', 'canceled', 'declined', 'error'];
 
+  if (['cancelled', 'canceled'].includes(status) || ['cancelled', 'canceled'].includes(reason)) return 'cancelled';
   if (failedStates.includes(status)) return 'failed';
   if (successStates.includes(status)) return 'success';
 
@@ -798,7 +800,7 @@ function interpretPaymentStatus(res, pollLabel) {
 async function pollPaymentStatus(transactionId, attempts = 0) {
   // Poll quickly for a responsive result, then stop the blocking spinner
   // after a short window. A pending transaction can still be checked again.
-  const MAX_ATTEMPTS = 60;
+  const MAX_ATTEMPTS = 6;
   const INTERVAL_MS = 500;
   lastPolledTransactionId = transactionId;
 
@@ -806,8 +808,8 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     // Genuinely unknown at this point — NOT a failure. The payment may still
     // complete on M-Pesa's side; we just stopped auto-checking. Let the
     // visitor manually check again instead of telling them it failed.
-    showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly. Tap \u201cCheck again\u201d in a moment.");
-    showToast('info', 'Verification is taking longer than expected. You can check again shortly.');
+    showPaymentStatus('pending', 'No final response yet. Tap Check again if you approved the prompt, or retry if you cancelled it.');
+    showToast('info', 'The prompt was not confirmed within three seconds. Check again or retry your gift.');
     return;
   }
 
@@ -827,6 +829,13 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
       clearPendingPayment(transactionId);
       showToast('failed', `Payment failed for ${transactionId}. Please try again.`);
       trackEvent('gift_failed');
+      return;
+    }
+    if (outcome === 'cancelled') {
+      console.log(`↩️ [${pollLabel}] CANCELLED`);
+      clearPendingPayment(transactionId);
+      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
+      trackEvent('gift_cancelled');
       return;
     }
     if (outcome === 'success') {
@@ -871,6 +880,10 @@ async function recheckPaymentStatus() {
       showToast('success', `Payment successful. Reference: ${lastPolledTransactionId}`);
       launchConfetti(60);
       trackEvent('gift_success');
+    } else if (outcome === 'cancelled') {
+      clearPendingPayment(lastPolledTransactionId);
+      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
+      trackEvent('gift_cancelled');
     } else if (outcome === 'failed') {
       clearPendingPayment(lastPolledTransactionId);
       showToast('failed', `Payment failed for ${lastPolledTransactionId}. Please try again.`);

@@ -34,13 +34,8 @@ function safeJSONParse(text) {
 async function apiRequest(path, options = {}) {
   const url = `${CONFIG.apiBaseUrl}${path}`;
   const controller = new AbortController();
-  // Render's free tier spins down idle services; the first request after a
-  // period of inactivity can take 30–50s to cold-start. 15s was too tight
-  // and made every "first" submission look like a failure. Individual
-  // callers can override this via options.timeoutMs where a shorter,
-  // more specific limit makes sense (e.g. "sending the prompt" is capped
-  // at 30s so a stuck request fails fast instead of leaving the visitor
-  // staring at a spinner for the full 45s).
+  // Callers can override this timeout for payment operations so a stalled
+  // request fails fast instead of leaving the visitor behind a long spinner.
   const { timeoutMs = 12000, ...fetchOptions } = options;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -582,22 +577,19 @@ function initGiftForm() {
 
     const payload = { amount, phone: normalizePhone(phoneInput.value.trim()) };
 
-    // If the initial request takes a while (cold backend, slow network),
-    // update the message instead of leaving a static line up for up to 45s
-    // with no sign anything is happening — that stillness is what reads as
-    // "frozen" or "slow" even when the request is actually progressing fine.
+    // If the initial request takes a few seconds, show progress instead of
+    // leaving a static message that looks frozen.
     const slowHint = setTimeout(() => {
       showPaymentStatus('preparing', 'Still preparing your payment — almost there...');
     }, 6000);
 
     try {
-      // Capped at 30s specifically for sending the M-Pesa prompt: if it
-      // hasn't gone out by then, fail fast and let the visitor retry
-      // rather than leaving them staring at a spinner indefinitely.
+      // Cap STK initiation so a stalled provider request fails fast and the
+      // visitor can retry instead of waiting behind an indefinite spinner.
       const initRes = await apiRequest('/api/payment', {
         method: 'POST',
         body: JSON.stringify(payload),
-        timeoutMs: 12000,
+        timeoutMs: 9000,
       });
       clearTimeout(slowHint);
       // Response envelope is { success, message, data: { reference, phone, amount } }.
@@ -675,15 +667,10 @@ function interpretPaymentStatus(res, pollLabel) {
 }
 
 async function pollPaymentStatus(transactionId, attempts = 0) {
-  // ~3 minutes total (3s * 60). M-Pesa STK confirmations are usually fast,
-  // but a visitor who hesitates on the prompt can genuinely take a while —
-  // and declaring "failed" after giving up early on a payment that then
-  // succeeds seconds later is worse than a longer wait. (A faster 1s
-  // interval was tried and reverted: it triples request volume to the
-  // backend for the same ~1 minute window and reintroduces exactly the
-  // false-failure risk this longer window was added to fix.)
-  const MAX_ATTEMPTS = 20;
-  const INTERVAL_MS = 1000;
+  // Poll quickly for a responsive result, then stop the blocking spinner
+  // after a short window. A pending transaction can still be checked again.
+  const MAX_ATTEMPTS = 16;
+  const INTERVAL_MS = 750;
   lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {
@@ -701,7 +688,7 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
   const pollLabel = `Payment Status Poll #${attempts + 1}`;
   try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`, { timeoutMs: 5000 });
+    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`, { timeoutMs: 4000 });
     console.log(`[${pollLabel}] Response:`, res);
 
     const outcome = interpretPaymentStatus(res, pollLabel);
@@ -745,7 +732,7 @@ async function recheckPaymentStatus() {
   showPaymentStatus('waiting', 'Checking...');
 
   try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`, { timeoutMs: 5000 });
+    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`, { timeoutMs: 4000 });
     const outcome = interpretPaymentStatus(res);
 
     if (outcome === 'success') {

@@ -639,7 +639,7 @@ function initGiftForm() {
     // If the initial request takes a few seconds, show progress instead of
     // leaving a static message that looks frozen.
     const slowHint = setTimeout(() => {
-      showPaymentStatus('preparing', 'Still preparing your payment — almost there...');
+      showPaymentStatus('preparing', 'Still preparing your payment. Almost there...');
     }, 6000);
 
     try {
@@ -756,8 +756,8 @@ function initWishForm() {
 // of one static line that makes the whole thing look stuck.
 function waitingMessageFor(attempts) {
   if (attempts < 3) return 'M-Pesa prompt sent. Waiting for your PIN confirmation...';
-  if (attempts < 7) return 'Still waiting — check your phone for the M-Pesa prompt.';
-  if (attempts < 13) return 'This can take a little longer sometimes — hang tight.';
+  if (attempts < 7) return 'Still waiting. Check your phone for the M-Pesa prompt.';
+  if (attempts < 13) return 'This can take a little longer sometimes. Hang tight.';
   return 'Waiting for PayHero to confirm your M-Pesa payment...';
 }
 
@@ -806,7 +806,7 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     // Genuinely unknown at this point — NOT a failure. The payment may still
     // complete on M-Pesa's side; we just stopped auto-checking. Let the
     // visitor manually check again instead of telling them it failed.
-    showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly — tap \u201cCheck again\u201d in a moment.");
+    showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly. Tap \u201cCheck again\u201d in a moment.");
     showToast('info', 'Verification is taking longer than expected. You can check again shortly.');
     return;
   }
@@ -878,10 +878,10 @@ async function recheckPaymentStatus() {
     } else if (outcome === 'unrecognized-finalized') {
       showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
     } else {
-      showPaymentStatus('pending', "Still processing — no confirmation yet. You're welcome to check again in a moment.");
+      showPaymentStatus('pending', "Still processing. There is no confirmation yet. You can check again in a moment.");
     }
   } catch {
-    showPaymentStatus('pending', "Couldn't check just now — please try again in a moment.");
+    showPaymentStatus('pending', "Couldn't check just now. Please try again in a moment.");
   } finally {
     recheckBtn.disabled = false;
   }
@@ -996,7 +996,7 @@ function initAudioFallback() {
   const player = $('#musicPlayer');
   if (!audio || !player) return;
   audio.addEventListener('error', () => {
-    player.setAttribute('title', 'Music track not found — add audio/happy-birthday.mp3');
+    player.setAttribute('title', 'Music track not found. Add audio/happy-birthday.mp3.');
     player.style.opacity = '0.4';
     player.style.pointerEvents = 'none';
   }, true);

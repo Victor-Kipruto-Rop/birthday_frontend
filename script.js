@@ -91,7 +91,7 @@ function describeRequestError(err) {
   return 'Something went wrong. Please try again later.';
 }
 
-function showToast(type, message, duration = 5000) {
+function showToast(type, message, duration = 3200) {
   const toast = $('#siteToast');
   const icon = $('#siteToastIcon');
   const messageEl = $('#siteToastMessage');
@@ -790,6 +790,7 @@ function showPaymentStatus(state, message) {
   const textEl = $('#paymentText');
   const iconEl = $('#paymentIcon');
 
+  clearTimeout(showPaymentStatus.dismissTimer);
   statusEl.classList.remove('state-success', 'state-failed', 'state-pending', 'can-close', 'can-recheck');
   statusEl.classList.add('is-visible');
   textEl.textContent = message;
@@ -804,6 +805,12 @@ function showPaymentStatus(state, message) {
     statusEl.classList.add('state-pending', 'can-close', 'can-recheck');
     iconEl.textContent = '⏳';
   }
+
+  if (state === 'success' || state === 'failed') {
+    showPaymentStatus.dismissTimer = setTimeout(() => {
+      statusEl.classList.remove('is-visible');
+    }, 3200);
+  }
 }
 
 function initPaymentRecheck() {
@@ -812,6 +819,7 @@ function initPaymentRecheck() {
 
 function initPaymentStatusClose() {
   $('#paymentClose')?.addEventListener('click', () => {
+    clearTimeout(showPaymentStatus.dismissTimer);
     $('#paymentStatus').classList.remove('is-visible');
   });
 }

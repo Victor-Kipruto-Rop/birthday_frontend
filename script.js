@@ -329,7 +329,6 @@ function initMusicPlayer() {
   const toggle = $('#musicToggle');
   const audio = $('#bgMusic');
   const volumeSlider = $('#volumeSlider');
-  let hasInteracted = false;
 
   audio.volume = Number(volumeSlider.value) / 100;
 
@@ -351,9 +350,8 @@ function initMusicPlayer() {
       toggle.classList.add('is-playing');
       toggle.setAttribute('aria-pressed', 'true');
       toggle.setAttribute('aria-label', 'Pause birthday music');
-      showToast('info', 'Celebration music is playing. Tap the music button anytime to turn it off.');
     }).catch(() => {
-      /* The first-interaction fallback below will retry when permitted. */
+      showToast('failed', 'Music could not be played. Please try again.');
     });
   }
 
@@ -366,7 +364,6 @@ function initMusicPlayer() {
   }
 
   toggle.addEventListener('click', () => {
-    hasInteracted = true;
     player.classList.add('is-active');
     if (audio.paused) playMusic(); else pauseMusic();
   });
@@ -375,21 +372,8 @@ function initMusicPlayer() {
     audio.volume = Number(volumeSlider.value) / 100;
   });
 
-  // Try immediately. Browsers that allow media autoplay will start it on page
-  // load; browsers that block audible autoplay will allow it after interaction.
-  playMusic();
-
-  const startAfterInteraction = () => {
-    if (hasInteracted) return;
-    hasInteracted = true;
-    if (audio.paused) playMusic();
-    ['click', 'keydown', 'touchstart'].forEach(eventName => {
-      document.removeEventListener(eventName, startAfterInteraction);
-    });
-  };
-  ['click', 'keydown', 'touchstart'].forEach(eventName => {
-    document.addEventListener(eventName, startAfterInteraction);
-  });
+  // Playback is intentionally started only by the dedicated music button.
+  // Generic page clicks, key presses, and opening the link never start audio.
 }
 
 /* ==========================================================================

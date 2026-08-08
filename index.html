@@ -62,10 +62,10 @@
     <span class="music-ring"></span>
   </button>
   <div class="music-panel" id="musicPanel">
-    <span class="music-label">Music on · tap the button to turn it off</span>
+    <span class="music-label">Tap to play celebration music</span>
     <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="55" aria-label="Volume">
   </div>
-  <audio id="bgMusic" loop autoplay preload="auto">
+  <audio id="bgMusic" loop preload="metadata">
     <source src="audio/happy-birthday.mp3" type="audio/mpeg">
   </audio>
 </div>

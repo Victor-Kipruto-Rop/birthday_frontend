@@ -5,7 +5,7 @@
    ========================================================================== */
 const CONFIG = {
   celebrantName: 'Rop',
-  birthdayISO: '2026-08-14T00:00:00', // target date/time for the countdown
+  submissionCutoffISO: '2026-08-09T00:00:00+03:00', // midnight at the end of today (East Africa Time)
   apiBaseUrl: 'https://birthday-backend-s1b7.onrender.com',
 
   // Optional: POST { event, meta } here for lightweight, non-blocking analytics.
@@ -41,7 +41,7 @@ async function apiRequest(path, options = {}) {
   // more specific limit makes sense (e.g. "sending the prompt" is capped
   // at 30s so a stuck request fails fast instead of leaving the visitor
   // staring at a spinner for the full 45s).
-  const { timeoutMs = 45000, ...fetchOptions } = options;
+  const { timeoutMs = 12000, ...fetchOptions } = options;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
@@ -89,6 +89,33 @@ function describeRequestError(err) {
     return err.message;
   }
   return 'Something went wrong. Please try again later.';
+}
+
+function showToast(type, message, duration = 5000) {
+  const toast = $('#siteToast');
+  const icon = $('#siteToastIcon');
+  const messageEl = $('#siteToastMessage');
+  if (!toast || !icon || !messageEl) return;
+
+  clearTimeout(showToast.dismissTimer);
+  toast.className = `site-toast toast-${type}`;
+  icon.textContent = type === 'success' ? '✓' : type === 'failed' ? '✕' : 'ℹ';
+  messageEl.textContent = message;
+  toast.hidden = false;
+  requestAnimationFrame(() => toast.classList.add('is-visible'));
+  showToast.dismissTimer = setTimeout(() => {
+    toast.classList.remove('is-visible');
+    setTimeout(() => { toast.hidden = true; }, 220);
+  }, duration);
+}
+
+function initToast() {
+  $('#siteToastClose')?.addEventListener('click', () => {
+    clearTimeout(showToast.dismissTimer);
+    const toast = $('#siteToast');
+    toast.classList.remove('is-visible');
+    setTimeout(() => { toast.hidden = true; }, 220);
+  });
 }
 
 /* ==========================================================================
@@ -324,8 +351,9 @@ function initMusicPlayer() {
       toggle.classList.add('is-playing');
       toggle.setAttribute('aria-pressed', 'true');
       toggle.setAttribute('aria-label', 'Pause birthday music');
+      showToast('info', 'Celebration music is playing. Tap the music button anytime to turn it off.');
     }).catch(() => {
-      /* Autoplay may still be blocked; user can retry via the button */
+      /* The first-interaction fallback below will retry when permitted. */
     });
   }
 
@@ -347,21 +375,34 @@ function initMusicPlayer() {
     audio.volume = Number(volumeSlider.value) / 100;
   });
 
-  // Attempt a muted-friendly first interaction pattern: only start on explicit click,
-  // per browser autoplay policy — no auto-start on load.
-  document.addEventListener('click', () => { hasInteracted = true; }, { once: true, capture: true });
+  // Try immediately. Browsers that allow media autoplay will start it on page
+  // load; browsers that block audible autoplay will allow it after interaction.
+  playMusic();
+
+  const startAfterInteraction = () => {
+    if (hasInteracted) return;
+    hasInteracted = true;
+    if (audio.paused) playMusic();
+    ['click', 'keydown', 'touchstart'].forEach(eventName => {
+      document.removeEventListener(eventName, startAfterInteraction);
+    });
+  };
+  ['click', 'keydown', 'touchstart'].forEach(eventName => {
+    document.addEventListener(eventName, startAfterInteraction);
+  });
 }
 
 /* ==========================================================================
    COUNTDOWN
    ========================================================================== */
 function initCountdown() {
-  const target = new Date(CONFIG.birthdayISO).getTime();
+  const target = new Date(CONFIG.submissionCutoffISO).getTime();
   const els = {
     days: $('#cd-days'), hours: $('#cd-hours'), minutes: $('#cd-minutes'), seconds: $('#cd-seconds'),
   };
   const caption = $('#countdownCaption');
   let previous = {};
+  let timer;
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -374,7 +415,9 @@ function initCountdown() {
       els.hours.textContent = '00';
       els.minutes.textContent = '00';
       els.seconds.textContent = '00';
-      caption.textContent = `The celebration has begun — happy birthday, ${CONFIG.celebrantName}!`;
+      caption.textContent = 'The window for sending gifts and wishes has closed. Thank you for celebrating!';
+      setSubmissionClosed();
+      showToast('info', 'Gifts and wishes are no longer being accepted.');
       clearInterval(timer);
       return;
     }
@@ -399,8 +442,30 @@ function initCountdown() {
     caption.textContent = `Every second brings us closer to celebrating ${CONFIG.celebrantName}.`;
   }
 
+  if (Date.now() >= target) {
+    update();
+    return;
+  }
   update();
-  const timer = setInterval(update, 1000);
+  timer = setInterval(update, 1000);
+}
+
+function setSubmissionClosed() {
+  const wishLink = $('#wishLink');
+  const giftLink = $('#giftLink');
+  const form = $('#giftForm');
+  const submitBtn = $('#giftSubmitBtn');
+  const closedMessage = $('#submissionClosedMessage');
+
+  [wishLink, giftLink].forEach(link => {
+    if (!link) return;
+    link.classList.add('is-disabled');
+    link.setAttribute('aria-disabled', 'true');
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+  });
+  if (form) form.classList.add('is-disabled');
+  if (submitBtn) submitBtn.disabled = true;
+  if (closedMessage) closedMessage.hidden = false;
 }
 
 /* ==========================================================================
@@ -475,6 +540,11 @@ function initGiftForm() {
   const honeypot = $('#giftWebsite');
   markFormRendered(form);
 
+  if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+    setSubmissionClosed();
+    return;
+  }
+
   // Second chance to warm the backend: if the page-load ping happened to
   // fail (or the visitor waited a long time before interacting), this
   // gives it another shot well before the real submission.
@@ -494,6 +564,11 @@ function initGiftForm() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+      setSubmissionClosed();
+      return;
+    }
 
     if (isLikelyBot(form, honeypot)) return;
 
@@ -534,7 +609,7 @@ function initGiftForm() {
       const initRes = await apiRequest('/api/payment', {
         method: 'POST',
         body: JSON.stringify(payload),
-        timeoutMs: 30000,
+        timeoutMs: 12000,
       });
       clearTimeout(slowHint);
       // Response envelope is { success, message, data: { reference, phone, amount } }.
@@ -547,6 +622,7 @@ function initGiftForm() {
       } else {
         // No transaction id returned — treat the initial request as sufficient confirmation.
         showPaymentStatus('success', 'Payment request sent. Thank you for your gift!');
+        showToast('success', 'Payment request sent successfully. Thank you for your gift!');
         launchConfetti(60);
         trackEvent('gift_success', { amount });
       }
@@ -559,10 +635,15 @@ function initGiftForm() {
         ? 'Sending the M-Pesa prompt timed out. Please try again.'
         : describeRequestError(err);
       showPaymentStatus('failed', message);
+      showToast('failed', message);
       trackEvent('gift_failed', { amount });
     } finally {
       submitBtn.classList.remove('is-loading');
-      submitBtn.disabled = false;
+      if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+        setSubmissionClosed();
+      } else {
+        submitBtn.disabled = false;
+      }
     }
   });
 }
@@ -615,8 +696,8 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
   // interval was tried and reverted: it triples request volume to the
   // backend for the same ~1 minute window and reintroduces exactly the
   // false-failure risk this longer window was added to fix.)
-  const MAX_ATTEMPTS = 60;
-  const INTERVAL_MS = 3000;
+  const MAX_ATTEMPTS = 20;
+  const INTERVAL_MS = 1000;
   lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {
@@ -624,6 +705,7 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     // complete on M-Pesa's side; we just stopped auto-checking. Let the
     // visitor manually check again instead of telling them it failed.
     showPaymentStatus('pending', "Still processing. If you approved the M-Pesa prompt, your gift should go through shortly — tap \u201cCheck again\u201d in a moment.");
+    showToast('info', 'Verification is taking longer than expected. You can check again shortly.');
     return;
   }
 
@@ -633,7 +715,7 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
   const pollLabel = `Payment Status Poll #${attempts + 1}`;
   try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`);
+    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`, { timeoutMs: 5000 });
     console.log(`[${pollLabel}] Response:`, res);
 
     const outcome = interpretPaymentStatus(res, pollLabel);
@@ -641,12 +723,14 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     if (outcome === 'failed') {
       console.log(`❌ [${pollLabel}] FAILED`);
       showPaymentStatus('failed', 'Payment failed. Please try again.');
+      showToast('failed', 'Payment failed. Please try again.');
       trackEvent('gift_failed');
       return;
     }
     if (outcome === 'success') {
       console.log(`✅ [${pollLabel}] SUCCESS`);
       showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
+      showToast('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
       trackEvent('gift_success');
       return;
@@ -677,15 +761,17 @@ async function recheckPaymentStatus() {
   showPaymentStatus('waiting', 'Checking...');
 
   try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`);
+    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`, { timeoutMs: 5000 });
     const outcome = interpretPaymentStatus(res);
 
     if (outcome === 'success') {
       showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
+      showToast('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
       trackEvent('gift_success');
     } else if (outcome === 'failed') {
       showPaymentStatus('failed', 'Payment failed. Please try again.');
+      showToast('failed', 'Payment failed. Please try again.');
       trackEvent('gift_failed');
     } else if (outcome === 'unrecognized-finalized') {
       showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
@@ -830,6 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGiftForm();
   initPaymentStatusClose();
   initPaymentRecheck();
+  initToast();
   warmUpBackend();
   trackEvent('page_view');
 });

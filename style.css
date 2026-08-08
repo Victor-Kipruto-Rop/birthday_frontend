@@ -473,6 +473,9 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
 }
 .countdown-label{ font-size: 12px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; }
 .countdown-caption{ margin-top: 22px; color: var(--text-secondary); font-size: 14px; }
+.is-disabled{ opacity: 0.65; }
+a.is-disabled{ cursor: not-allowed; }
+.submission-closed-message{ color: var(--text-secondary); text-align: center; margin: 0 0 20px; }
 
 /* ==========================================================================
    FORMS (shared field styling)
@@ -580,6 +583,24 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
   display: none; align-items: center; justify-content: center; font-size: 12px;
 }
 .payment-status.can-close .payment-close{ display: flex; }
+
+.site-toast{
+  position: fixed; top: 22px; right: 22px; z-index: 1000;
+  display: flex; align-items: center; gap: 10px; width: min(360px, calc(100vw - 32px));
+  padding: 13px 14px; border: 1px solid var(--glass-border); border-radius: 12px;
+  color: var(--white); background: rgba(15, 23, 42, 0.94); box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+  transform: translateY(-14px); opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.site-toast.is-visible{ transform: translateY(0); opacity: 1; pointer-events: auto; }
+.site-toast-icon{ flex: 0 0 24px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; }
+.toast-success{ border-color: rgba(0,230,118,0.6); }
+.toast-success .site-toast-icon{ color: #06280A; background: var(--green); }
+.toast-failed{ border-color: rgba(255,92,92,0.65); }
+.toast-failed .site-toast-icon{ color: #3b0909; background: #ff5c5c; }
+.toast-info .site-toast-icon{ color: #3b2600; background: var(--amber); }
+.site-toast-message{ flex: 1; font-size: 13px; line-height: 1.4; }
+.site-toast-close{ border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; }
 
 /* ==========================================================================
    APPRECIATION

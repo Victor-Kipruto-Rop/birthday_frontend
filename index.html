@@ -62,10 +62,10 @@
     <span class="music-ring"></span>
   </button>
   <div class="music-panel" id="musicPanel">
-    <span class="music-label">Celebration Music</span>
+    <span class="music-label">Music on · tap the button to turn it off</span>
     <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="55" aria-label="Volume">
   </div>
-  <audio id="bgMusic" loop preload="none">
+  <audio id="bgMusic" loop autoplay preload="auto">
     <source src="audio/happy-birthday.mp3" type="audio/mpeg">
   </audio>
 </div>
@@ -99,10 +99,10 @@
         One more year in the books — same drive, sharper focus, more still to build.
       </p>
       <div class="hero-actions reveal-up" data-delay="5">
-        <a href="https://wa.me/254723484552?text=Hi%20Rop%21%20%F0%9F%8E%89%20Happy%20Birthday%21%20Just%20wanted%20to%20drop%20by%20and%20wish%20you%20an%20amazing%20day.%20Hope%20it%27s%20filled%20with%20everything%20good." target="_blank" rel="noopener noreferrer" class="btn btn-primary magnetic">
+        <a id="wishLink" href="https://wa.me/254723484552?text=Hi%20Rop%21%20%F0%9F%8E%89%20Happy%20Birthday%21%20Just%20wanted%20to%20drop%20by%20and%20wish%20you%20an%20amazing%20day.%20Hope%20it%27s%20filled%20with%20everything%20good." target="_blank" rel="noopener noreferrer" class="btn btn-primary magnetic">
           <span>Leave a Wish</span>
         </a>
-        <a href="#gift" class="btn btn-ghost magnetic">
+        <a id="giftLink" href="#gift" class="btn btn-ghost magnetic">
           <span>Send a Gift</span>
         </a>
       </div>
@@ -148,6 +148,7 @@
     </div>
 
     <form class="gift-card glass reveal-up" id="giftForm" novalidate>
+      <p class="submission-closed-message" id="submissionClosedMessage" hidden>Gifts and wishes are no longer being accepted. Thank you for celebrating!</p>
       <!-- Honeypot: hidden from real visitors, catches basic bots. Never remove. -->
       <div class="hp-field" aria-hidden="true">
         <label for="giftWebsite">Leave this field empty</label>
@@ -222,6 +223,12 @@
 </footer>
 
 <div id="confettiRoot" class="confetti-root" aria-hidden="true"></div>
+
+<div class="site-toast" id="siteToast" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <span class="site-toast-icon" id="siteToastIcon" aria-hidden="true"></span>
+  <span class="site-toast-message" id="siteToastMessage"></span>
+  <button class="site-toast-close" id="siteToastClose" type="button" aria-label="Close notification">✕</button>
+</div>
 
 <script src="script.js"></script>
 </body>

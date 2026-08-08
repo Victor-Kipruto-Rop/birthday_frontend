@@ -12,7 +12,7 @@ A luxurious, animated birthday microsite built with plain HTML, CSS, and JavaScr
 - "Leave a Wish" button opens a prefilled WhatsApp chat directly with Rop — no form, no backend round-trip
 - Gift/payment form (`POST /api/payment`) with M-Pesa phone validation, live status polling (`GET /api/payment-status/:id`), honeypot spam-trap, and confetti on success
 - Backend warm-up ping on page load and a 45s request timeout, to absorb Render free-tier cold starts without showing false failures
-- Floating music player with fade in/out, volume control, browser-autoplay-safe behavior (starts only after a user click), and automatic graceful degradation if the track file is missing
+- Floating music player with fade in/out, volume control, autoplay where supported, first-interaction fallback when the browser blocks autoplay, and automatic graceful degradation if the track file is missing
 - Favicon (SVG + ICO + PNG + apple-touch-icon), web manifest, and a matching 404 page
 - Open Graph / Twitter card meta tags with a generated social preview image
 - Optional, privacy-friendly, non-blocking event tracking (page views, gift submissions) — off by default

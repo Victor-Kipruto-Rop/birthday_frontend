@@ -773,6 +773,10 @@ section{ padding-left: clamp(20px, 5vw, 64px); padding-right: clamp(20px, 5vw, 6
 .hero-name{
   position: relative;
   display: inline-block;
+  font-family: 'Great Vibes', cursive;
+  font-size: 1.2em;
+  font-weight: 400;
+  letter-spacing: 0.02em;
   color: var(--white);
   -webkit-text-fill-color: var(--white);
   background: none;

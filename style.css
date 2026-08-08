@@ -680,3 +680,114 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
   .btn{ width: 100%; }
   .amount-chip{ min-width: 80px; }
 }
+
+/* ==========================================================================
+   MODERN EMERALD REFINEMENT
+   ========================================================================== */
+:root{
+  --onyx: #071512;
+  --onyx-deep: #030908;
+  --onyx-soft: #10251f;
+  --green: #39f29a;
+  --green-deep: #11b96c;
+  --amber: #ffd166;
+  --amber-deep: #f59e0b;
+  --glass-bg: rgba(18, 47, 38, 0.52);
+  --glass-border: rgba(155, 255, 210, 0.18);
+  --text-primary: rgba(246, 255, 250, 0.98);
+  --text-secondary: rgba(214, 239, 226, 0.72);
+  --text-muted: rgba(190, 222, 207, 0.48);
+  --radius-md: 22px;
+  --radius-lg: 30px;
+  --shadow-glow: 0 12px 44px rgba(57, 242, 154, 0.2);
+}
+
+body{
+  background: var(--onyx-deep);
+  background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.bg-gradient{
+  background:
+    radial-gradient(circle at 12% 12%, rgba(57,242,154,0.22), transparent 36%),
+    radial-gradient(circle at 88% 18%, rgba(255,209,102,0.16), transparent 32%),
+    radial-gradient(circle at 50% 92%, rgba(12,116,73,0.22), transparent 48%),
+    linear-gradient(180deg, #0b211a 0%, var(--onyx-deep) 100%);
+  opacity: 0.92;
+}
+.bg-rays{ opacity: 0.45; }
+.glass{
+  background: linear-gradient(145deg, rgba(30, 76, 60, 0.62), rgba(9, 25, 20, 0.68));
+  border-color: rgba(155, 255, 210, 0.2);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+section{ padding-left: clamp(20px, 5vw, 64px); padding-right: clamp(20px, 5vw, 64px); }
+.hero{ padding-top: clamp(72px, 10vh, 120px); }
+.hero-content{ max-width: 820px; }
+.hero-avatar{
+  width: 156px; height: 156px;
+  border-color: rgba(57,242,154,0.65);
+  box-shadow: 0 0 0 8px rgba(57,242,154,0.08), 0 24px 60px rgba(0,0,0,0.42);
+}
+.hero-title{ font-size: clamp(44px, 8.5vw, 92px); letter-spacing: -0.045em; }
+.hero-name{ background: linear-gradient(110deg, var(--green) 5%, var(--amber) 72%, #fff1b8); }
+.hero-subtitle{ max-width: 580px; font-size: clamp(16px, 2vw, 19px); line-height: 1.7; }
+.hero-actions{ margin-top: 34px; }
+.btn{ padding: 15px 28px; box-shadow: none; }
+.btn-primary{
+  background: linear-gradient(120deg, var(--green-deep), var(--green));
+  color: #062016; box-shadow: 0 12px 28px rgba(17,185,108,0.25);
+}
+.btn-primary:hover{ box-shadow: 0 18px 38px rgba(57,242,154,0.3); }
+.btn-ghost{ background: rgba(255,255,255,0.055); border-color: rgba(155,255,210,0.24); }
+.btn-ghost:hover{ background: rgba(57,242,154,0.1); border-color: rgba(57,242,154,0.5); }
+.btn-gold{ background: linear-gradient(120deg, var(--amber), #ffe59a); box-shadow: 0 12px 28px rgba(245,158,11,0.2); }
+
+.section-eyebrow{ color: var(--green); letter-spacing: 0.12em; }
+.section-title{ letter-spacing: -0.035em; }
+.countdown-grid{ max-width: 700px; gap: 14px; margin-top: 36px; }
+.countdown-card{ padding: 30px 10px; }
+.countdown-number{ color: var(--green); text-shadow: 0 0 22px rgba(57,242,154,0.2); }
+.countdown-label{ letter-spacing: 0.18em; }
+
+.gift-section{ padding-top: clamp(80px, 11vw, 140px); }
+.gift-card{ padding: clamp(26px, 5vw, 48px); gap: 22px; }
+.amount-chip{ background: rgba(255,255,255,0.035); border-color: rgba(155,255,210,0.2); }
+.amount-chip:hover{ border-color: var(--green); color: var(--green); }
+.amount-chip.is-selected{ background: linear-gradient(120deg, var(--green-deep), var(--green)); color: #062016; }
+.field-input{ background: rgba(2, 12, 9, 0.28); border-color: rgba(155,255,210,0.2); }
+.field-input:focus{ border-color: var(--green); box-shadow: 0 0 0 4px rgba(57,242,154,0.12); }
+.secure-badge{ padding-top: 4px; }
+
+.appreciation-section{ padding-top: clamp(90px, 14vw, 170px); padding-bottom: clamp(90px, 14vw, 170px); }
+.appreciation-heart{ color: var(--green); filter: drop-shadow(0 0 16px rgba(57,242,154,0.45)); }
+.footer-heart{ color: var(--green); }
+.footer-link:hover{ color: var(--green); }
+.footer-link::after{ background: var(--green); }
+.music-toggle, .music-panel, .back-to-top{ background: rgba(10, 34, 26, 0.72); border-color: rgba(155,255,210,0.2); }
+.music-toggle{ color: var(--green); }
+.music-toggle:hover, .back-to-top:hover{ box-shadow: var(--shadow-glow); }
+.music-ring{ border-color: rgba(57,242,154,0.55); }
+.volume-slider::-webkit-slider-thumb, .volume-slider::-moz-range-thumb{ background: var(--green); }
+.scroll-progress{ background: linear-gradient(90deg, var(--green-deep), var(--green), var(--amber)); }
+
+@media (max-width: 720px){
+  section{ padding-top: 76px; padding-bottom: 76px; }
+  .hero{ min-height: auto; padding-top: 76px; padding-bottom: 72px; }
+  .hero-avatar{ width: 124px; height: 124px; }
+  .hero-title{ font-size: clamp(42px, 14vw, 68px); }
+  .hero-subtitle{ font-size: 15px; }
+  .countdown-grid{ gap: 8px; }
+  .countdown-card{ padding: 22px 5px; }
+  .countdown-label{ font-size: 10px; letter-spacing: 0.12em; }
+  .gift-card{ border-radius: 24px; }
+}
+
+@media (max-width: 480px){
+  .music-player{ top: 14px; right: 14px; }
+  .music-toggle{ width: 46px; height: 46px; }
+  .hero-actions{ gap: 12px; }
+  .btn{ min-height: 52px; }
+  .section-desc{ font-size: 15px; }
+}

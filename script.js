@@ -26,6 +26,7 @@ const CONFIG = {
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const PENDING_PAYMENT_KEY = 'birthday_pending_payment';
 
 function safeJSONParse(text) {
   try { return JSON.parse(text); } catch { return null; }
@@ -115,6 +116,15 @@ function initToast() {
     toast.classList.remove('is-visible');
     setTimeout(() => { toast.hidden = true; }, 220);
   });
+}
+
+function savePendingPayment(reference, amount) {
+  localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({ reference, amount, savedAt: Date.now() }));
+}
+
+function clearPendingPayment(reference = null) {
+  const saved = safeJSONParse(localStorage.getItem(PENDING_PAYMENT_KEY) || '');
+  if (!reference || saved?.reference === reference) localStorage.removeItem(PENDING_PAYMENT_KEY);
 }
 
 /* ==========================================================================
@@ -647,6 +657,7 @@ function initGiftForm() {
       showPaymentStatus('waiting', 'M-Pesa prompt sent. Enter your PIN to approve the gift...');
 
       if (transactionId) {
+        savePendingPayment(transactionId, amount);
         await pollPaymentStatus(transactionId);
       } else {
         // No transaction id returned — show the result once as a toast.
@@ -813,13 +824,15 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
     if (outcome === 'failed') {
       console.log(`❌ [${pollLabel}] FAILED`);
-      showToast('failed', 'Payment failed. Please try again.');
+      clearPendingPayment(transactionId);
+      showToast('failed', `Payment failed for ${transactionId}. Please try again.`);
       trackEvent('gift_failed');
       return;
     }
     if (outcome === 'success') {
       console.log(`✅ [${pollLabel}] SUCCESS`);
-      showToast('success', 'Payment successful. Thank you for your gift!');
+      clearPendingPayment(transactionId);
+      showToast('success', `Payment successful. Reference: ${transactionId}`);
       launchConfetti(60);
       trackEvent('gift_success');
       return;
@@ -854,11 +867,13 @@ async function recheckPaymentStatus() {
     const outcome = interpretPaymentStatus(res);
 
     if (outcome === 'success') {
-      showToast('success', 'Payment successful. Thank you for your gift!');
+      clearPendingPayment(lastPolledTransactionId);
+      showToast('success', `Payment successful. Reference: ${lastPolledTransactionId}`);
       launchConfetti(60);
       trackEvent('gift_success');
     } else if (outcome === 'failed') {
-      showToast('failed', 'Payment failed. Please try again.');
+      clearPendingPayment(lastPolledTransactionId);
+      showToast('failed', `Payment failed for ${lastPolledTransactionId}. Please try again.`);
       trackEvent('gift_failed');
     } else if (outcome === 'unrecognized-finalized') {
       showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
@@ -902,6 +917,17 @@ function showPaymentStatus(state, message) {
 
 function initPaymentRecheck() {
   $('#paymentRecheck')?.addEventListener('click', recheckPaymentStatus);
+}
+
+async function resumePendingPayment() {
+  const saved = safeJSONParse(localStorage.getItem(PENDING_PAYMENT_KEY) || '');
+  if (!saved?.reference || Date.now() - Number(saved.savedAt || 0) > 24 * 60 * 60 * 1000) {
+    clearPendingPayment();
+    return;
+  }
+  lastPolledTransactionId = saved.reference;
+  showToast('info', `Checking your pending payment: ${saved.reference}`);
+  await pollPaymentStatus(saved.reference);
 }
 
 function initPaymentStatusClose() {
@@ -1025,6 +1051,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPaymentStatusClose();
   initPaymentRecheck();
   initToast();
+  resumePendingPayment();
   warmUpBackend();
   trackEvent('page_view');
 });

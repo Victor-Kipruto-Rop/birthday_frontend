@@ -644,7 +644,7 @@ function initGiftForm() {
       // Response envelope is { success, message, data: { reference, phone, amount } }.
       const transactionId = initRes?.data?.reference;
 
-      showPaymentStatus('waiting', 'Waiting for confirmation on your phone...');
+      showPaymentStatus('waiting', 'M-Pesa prompt sent. Enter your PIN to approve the gift...');
 
       if (transactionId) {
         await pollPaymentStatus(transactionId);
@@ -744,7 +744,7 @@ function initWishForm() {
 // up to a minute of waiting for an M-Pesa STK push to be answered, instead
 // of one static line that makes the whole thing look stuck.
 function waitingMessageFor(attempts) {
-  if (attempts < 3) return 'Waiting for confirmation on your phone...';
+  if (attempts < 3) return 'M-Pesa prompt sent. Waiting for your PIN confirmation...';
   if (attempts < 7) return 'Still waiting — check your phone for the M-Pesa prompt.';
   if (attempts < 13) return 'This can take a little longer sometimes — hang tight.';
   return 'Waiting for PayHero to confirm your M-Pesa payment...';

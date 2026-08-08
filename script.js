@@ -747,7 +747,7 @@ function waitingMessageFor(attempts) {
   if (attempts < 3) return 'Waiting for confirmation on your phone...';
   if (attempts < 7) return 'Still waiting — check your phone for the M-Pesa prompt.';
   if (attempts < 13) return 'This can take a little longer sometimes — hang tight.';
-  return 'Still working on it — thanks for your patience.';
+  return 'Waiting for PayHero to confirm your M-Pesa payment...';
 }
 
 // Tracks the transaction currently being polled so the manual "Check again"
@@ -762,11 +762,16 @@ let lastPolledTransactionId = null;
 // an unrecognized status is surfaced as pending (not success) - "finalized"
 // only means the backend is done processing, not that it succeeded.
 function interpretPaymentStatus(res, pollLabel) {
-  const rawStatus = res?.data?.status;
+  const statusData = res?.data || {};
+  const rawStatus = statusData.status
+    ?? statusData.Status
+    ?? statusData.payment_status
+    ?? statusData.PaymentStatus
+    ?? statusData.provider_status;
   const status = String(rawStatus ?? '').toLowerCase().trim();
   if (pollLabel) console.log(`[${pollLabel}] Raw Status: "${rawStatus}", Normalized: "${status}"`);
 
-  const successStates = ['success', 'completed', 'complete', 'paid', '0'];
+  const successStates = ['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'];
   const failedStates = ['failed', 'cancelled', 'canceled', 'declined', 'error'];
 
   if (failedStates.includes(status)) return 'failed';
@@ -782,8 +787,8 @@ function interpretPaymentStatus(res, pollLabel) {
 async function pollPaymentStatus(transactionId, attempts = 0) {
   // Poll quickly for a responsive result, then stop the blocking spinner
   // after a short window. A pending transaction can still be checked again.
-  const MAX_ATTEMPTS = 16;
-  const INTERVAL_MS = 750;
+  const MAX_ATTEMPTS = 60;
+  const INTERVAL_MS = 500;
   lastPolledTransactionId = transactionId;
 
   if (attempts >= MAX_ATTEMPTS) {

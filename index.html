@@ -99,7 +99,7 @@
         One more year in the books — same drive, sharper focus, more still to build.
       </p>
       <div class="hero-actions reveal-up" data-delay="5">
-        <a id="wishLink" href="https://wa.me/254723484552?text=Hi%20Rop%21%20%F0%9F%8E%89%20Happy%20Birthday%21%20Just%20wanted%20to%20drop%20by%20and%20wish%20you%20an%20amazing%20day.%20Hope%20it%27s%20filled%20with%20everything%20good." target="_blank" rel="noopener noreferrer" class="btn btn-primary magnetic">
+        <a id="wishLink" href="#wish" class="btn btn-primary magnetic">
           <span>Leave a Wish</span>
         </a>
         <a id="giftLink" href="#gift" class="btn btn-ghost magnetic">
@@ -111,6 +111,40 @@
         <span class="scroll-indicator-dot"></span>
       </button>
     </div>
+  </section>
+
+  <!-- ================= WISH ================= -->
+  <section class="wish-section" id="wish">
+    <div class="section-head">
+      <p class="section-eyebrow reveal-up">// 03 &mdash; WORDS FROM THE HEART</p>
+      <h2 class="section-title reveal-up">Leave a Birthday Wish</h2>
+      <p class="section-desc reveal-up">Share a message for Rop. Your wish will be delivered securely.</p>
+    </div>
+    <form class="wish-card glass reveal-up" id="wishForm" novalidate>
+      <div class="hp-field" aria-hidden="true">
+        <label for="wishWebsite">Leave this field empty</label>
+        <input type="text" id="wishWebsite" name="website" tabindex="-1" autocomplete="off">
+      </div>
+      <div class="field">
+        <input type="text" id="wishName" class="field-input" placeholder=" " autocomplete="name" required>
+        <label for="wishName" class="field-label">Your name</label>
+        <span class="field-error" id="wishNameError"></span>
+      </div>
+      <div class="field">
+        <input type="tel" id="wishPhone" class="field-input" placeholder=" " autocomplete="tel" required maxlength="15">
+        <label for="wishPhone" class="field-label">Your phone number</label>
+        <span class="field-error" id="wishPhoneError"></span>
+      </div>
+      <div class="field">
+        <textarea id="wishMessage" class="field-input" placeholder=" " rows="4" maxlength="1000" required></textarea>
+        <label for="wishMessage" class="field-label">Your birthday message</label>
+        <span class="field-error" id="wishMessageError"></span>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block magnetic" id="wishSubmitBtn">
+        <span class="btn-text">Send Wish</span>
+        <span class="btn-spinner" aria-hidden="true"></span>
+      </button>
+    </form>
   </section>
 
   <!-- ================= COUNTDOWN ================= -->
@@ -142,9 +176,14 @@
   <!-- ================= GIFT / PAYMENT ================= -->
   <section class="gift-section" id="gift">
     <div class="section-head">
-      <p class="section-eyebrow reveal-up">// 03 &mdash; A SMALL GESTURE</p>
+      <p class="section-eyebrow reveal-up">// 04 &mdash; A SMALL GESTURE</p>
       <h2 class="section-title reveal-up">Send a Birthday Gift</h2>
       <p class="section-desc reveal-up">Sent securely via M-Pesa. Every contribution adds to a beautiful day.</p>
+      <div class="payment-guide reveal-up" aria-label="How payment works">
+        <span>1. Enter amount and phone</span>
+        <span>2. Confirm the recipient</span>
+        <span>3. Approve the M-Pesa prompt</span>
+      </div>
     </div>
 
     <form class="gift-card glass reveal-up" id="giftForm" novalidate>

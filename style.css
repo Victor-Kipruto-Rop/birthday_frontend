@@ -514,6 +514,15 @@ a.is-disabled{ cursor: not-allowed; }
   max-width: 520px; margin: 0 auto; padding: 40px clamp(20px,4vw,44px);
   display: flex; flex-direction: column; gap: 26px;
 }
+.wish-card{
+  max-width: 620px; margin: 0 auto; padding: 40px clamp(20px,4vw,44px);
+  display: flex; flex-direction: column; gap: 20px;
+}
+.payment-guide{
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
+  margin: 18px auto 0; color: var(--text-muted); font-size: 12px;
+}
+.payment-guide span::before{ content: '•'; color: var(--green); margin-right: 6px; }
 /* Honeypot: off-screen, not display:none, so basic bots that skip hidden fields still fill it in */
 .hp-field{
   position: absolute; left: -9999px; top: -9999px;

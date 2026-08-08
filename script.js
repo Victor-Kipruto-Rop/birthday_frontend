@@ -439,6 +439,8 @@ function setSubmissionClosed() {
   const form = $('#giftForm');
   const submitBtn = $('#giftSubmitBtn');
   const closedMessage = $('#submissionClosedMessage');
+  const wishForm = $('#wishForm');
+  const wishSubmitBtn = $('#wishSubmitBtn');
 
   [wishLink, giftLink].forEach(link => {
     if (!link) return;
@@ -448,6 +450,8 @@ function setSubmissionClosed() {
   });
   if (form) form.classList.add('is-disabled');
   if (submitBtn) submitBtn.disabled = true;
+  if (wishForm) wishForm.classList.add('is-disabled');
+  if (wishSubmitBtn) wishSubmitBtn.disabled = true;
   if (closedMessage) closedMessage.hidden = false;
 }
 
@@ -660,6 +664,70 @@ function initGiftForm() {
         : describeRequestError(err);
       showToast('failed', message);
       trackEvent('gift_failed', { amount });
+    } finally {
+      submitBtn.classList.remove('is-loading');
+      if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+        setSubmissionClosed();
+      } else {
+        submitBtn.disabled = false;
+      }
+    }
+  });
+}
+
+function initWishForm() {
+  const form = $('#wishForm');
+  if (!form) return;
+  const nameInput = $('#wishName');
+  const phoneInput = $('#wishPhone');
+  const messageInput = $('#wishMessage');
+  const submitBtn = $('#wishSubmitBtn');
+  const honeypot = $('#wishWebsite');
+  markFormRendered(form);
+
+  if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+    setSubmissionClosed();
+    return;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
+      setSubmissionClosed();
+      return;
+    }
+    if (isLikelyBot(form, honeypot)) return;
+
+    let valid = true;
+    const name = nameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const message = messageInput.value.trim();
+    if (name.length < 2) {
+      setFieldError('wishName', 'wishNameError', 'Enter your name.');
+      valid = false;
+    } else setFieldError('wishName', 'wishNameError', '');
+    if (!isValidPhone(phone)) {
+      setFieldError('wishPhone', 'wishPhoneError', 'Enter a valid phone number.');
+      valid = false;
+    } else setFieldError('wishPhone', 'wishPhoneError', '');
+    if (!message) {
+      setFieldError('wishMessage', 'wishMessageError', 'Write a birthday message.');
+      valid = false;
+    } else setFieldError('wishMessage', 'wishMessageError', '');
+    if (!valid) return;
+
+    submitBtn.classList.add('is-loading');
+    submitBtn.disabled = true;
+    try {
+      await apiRequest('/api/wish', {
+        method: 'POST',
+        body: JSON.stringify({ name, phone: normalizePhone(phone), message }),
+        timeoutMs: 9000,
+      });
+      showToast('success', 'Your birthday wish was sent successfully. Thank you!');
+      form.reset();
+    } catch (err) {
+      showToast('failed', describeRequestError(err));
     } finally {
       submitBtn.classList.remove('is-loading');
       if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
@@ -920,10 +988,21 @@ function warmUpBackend() {
   });
 }
 
+async function syncAvailability() {
+  try {
+    const response = await apiRequest('/api/availability', { timeoutMs: 3000 });
+    const cutoff = response?.data?.cutoff_iso;
+    if (cutoff) CONFIG.submissionCutoffISO = cutoff;
+  } catch {
+    // Keep the static fallback if the backend is waking up or unavailable.
+  }
+}
+
 /* ==========================================================================
    INIT
    ========================================================================== */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await syncAvailability();
   applyPersonalization();
   initFooterLinks();
   initLoader();
@@ -936,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCountdown();
   initMagneticButtons();
   initGiftForm();
+  initWishForm();
   initPaymentConfirmation();
   initPaymentStatusClose();
   initPaymentRecheck();

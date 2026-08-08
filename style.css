@@ -476,6 +476,36 @@ section{ position: relative; padding: var(--section-pad) 24px; max-width: 1180px
 .is-disabled{ opacity: 0.65; }
 a.is-disabled{ cursor: not-allowed; }
 .submission-closed-message{ color: var(--text-secondary); text-align: center; margin: 0 0 20px; }
+.confirmation-open{ overflow: hidden; }
+.payment-confirmation{
+  position: fixed; inset: 0; z-index: 850; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(2, 9, 7, 0.72); backdrop-filter: blur(8px);
+}
+.payment-confirmation[hidden]{ display: none; }
+.payment-confirmation-card{
+  position: relative; width: min(390px, 100%); padding: 30px 26px 24px; text-align: center;
+  background: linear-gradient(145deg, rgba(30,76,60,0.96), rgba(7,21,16,0.98));
+  border: 1px solid rgba(155,255,210,0.3); border-radius: 24px;
+  box-shadow: 0 28px 90px rgba(0,0,0,0.5); animation: success-pop .25s var(--ease-out);
+}
+.payment-confirmation-close{
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--glass-border); background: transparent; color: var(--text-muted);
+}
+.confirmation-icon{
+  width: 44px; height: 44px; margin: 0 auto 14px; display: grid; place-items: center;
+  border-radius: 50%; color: #062016; background: var(--green); font-size: 22px; font-weight: 700;
+}
+.payment-confirmation-card h3{ font-size: 22px; margin-bottom: 8px; }
+.payment-confirmation-card p{ color: var(--text-secondary); font-size: 14px; }
+.confirmation-summary{
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 22px 0;
+  padding: 15px; text-align: left; border-radius: 14px; background: rgba(2,12,9,0.28);
+}
+.confirmation-summary span{ color: var(--text-muted); font-size: 12px; }
+.confirmation-summary strong{ color: var(--text-primary); font-size: 14px; text-align: right; }
+.confirmation-actions{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.confirmation-actions .btn{ min-height: 48px; padding: 12px 16px; }
 
 /* ==========================================================================
    FORMS (shared field styling)

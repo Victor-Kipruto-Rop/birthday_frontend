@@ -185,6 +185,25 @@
       </div>
     </form>
 
+    <div class="payment-confirmation" id="paymentConfirmation" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle" aria-describedby="confirmationMessage" hidden>
+      <div class="payment-confirmation-card">
+        <button class="payment-confirmation-close" id="confirmationClose" type="button" aria-label="Cancel payment">✕</button>
+        <div class="confirmation-icon" aria-hidden="true">↗</div>
+        <h3 id="confirmationTitle">Confirm your gift</h3>
+        <p id="confirmationMessage">Are you sure you want to send this gift?</p>
+        <div class="confirmation-summary">
+          <span>Recipient</span>
+          <strong>Victor Rop</strong>
+          <span>Amount</span>
+          <strong id="confirmationAmount">KES 0</strong>
+        </div>
+        <div class="confirmation-actions">
+          <button class="btn btn-ghost" id="confirmationCancel" type="button">Cancel</button>
+          <button class="btn btn-gold" id="confirmationProceed" type="button">Proceed</button>
+        </div>
+      </div>
+    </div>
+
     <div class="payment-status" id="paymentStatus" role="status" aria-live="polite">
       <div class="payment-status-inner">
         <div class="payment-spinner" id="paymentSpinner"></div>

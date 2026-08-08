@@ -510,6 +510,48 @@ function isLikelyBot(form, honeypotInput) {
   return false;
 }
 
+let confirmationResolve = null;
+
+function requestPaymentConfirmation(amount) {
+  const modal = $('#paymentConfirmation');
+  const amountEl = $('#confirmationAmount');
+  if (!modal || !amountEl) return Promise.resolve(true);
+
+  amountEl.textContent = `KES ${amount.toLocaleString('en-KE')}`;
+  modal.hidden = false;
+  document.body.classList.add('confirmation-open');
+  $('#confirmationProceed')?.focus();
+
+  return new Promise(resolve => {
+    confirmationResolve = resolve;
+  });
+}
+
+function closePaymentConfirmation(confirmed) {
+  const modal = $('#paymentConfirmation');
+  if (!modal || !confirmationResolve) return;
+
+  modal.hidden = true;
+  document.body.classList.remove('confirmation-open');
+  const resolve = confirmationResolve;
+  confirmationResolve = null;
+  resolve(confirmed);
+}
+
+function initPaymentConfirmation() {
+  $('#confirmationProceed')?.addEventListener('click', () => closePaymentConfirmation(true));
+  $('#confirmationCancel')?.addEventListener('click', () => closePaymentConfirmation(false));
+  $('#confirmationClose')?.addEventListener('click', () => closePaymentConfirmation(false));
+  $('#paymentConfirmation')?.addEventListener('click', (event) => {
+    if (event.target.id === 'paymentConfirmation') closePaymentConfirmation(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !$('#paymentConfirmation')?.hidden) {
+      closePaymentConfirmation(false);
+    }
+  });
+}
+
 /* ==========================================================================
    GIFT / PAYMENT FORM
    ========================================================================== */
@@ -568,6 +610,9 @@ function initGiftForm() {
     } else setFieldError('giftPhone', 'giftPhoneError', '');
 
     if (!valid) return;
+
+    const confirmed = await requestPaymentConfirmation(amount);
+    if (!confirmed) return;
 
     submitBtn.classList.add('is-loading');
     submitBtn.disabled = true;
@@ -891,6 +936,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCountdown();
   initMagneticButtons();
   initGiftForm();
+  initPaymentConfirmation();
   initPaymentStatusClose();
   initPaymentRecheck();
   initToast();

@@ -778,13 +778,9 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
   .music-panel{ display: none; }
   .balloon-3{ display: none; }
 }
-   ========================================================================== */
-@media (max-width: 720px){
-  :root{ --section-pad: 64px; }
-  .countdown-grid{ gap: 10px; }
-  .music-panel{ display: none; }
-  .balloon-3{ display: none; }
-}
+@media (max-width: 480px){
+  .hero-actions{ flex-direction: column; width: 100%; }
+  .btn{ width: 100%; }
 @media (max-width: 480px){
   .hero-actions{ flex-direction: column; width: 100%; }
   .btn{ width: 100%; }
@@ -916,6 +912,37 @@ section{ padding-left: clamp(20px, 5vw, 64px); padding-right: clamp(20px, 5vw, 6
 .contribution-name{ font-size: 1rem; font-weight: 600; color: var(--white); }
 .contribution-time{ font-size: 0.84rem; color: var(--text-secondary); white-space: nowrap; }
 .contribution-note{ padding: 24px; text-align: center; color: var(--text-secondary); }
+.contribution-locker{
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  padding: 32px;
+  text-align: center;
+  background: rgba(4, 8, 12, 0.95);
+  backdrop-filter: blur(12px);
+  color: var(--text-primary);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.32s var(--ease-out), visibility 0.32s;
+}
+.contribution-locker.is-visible{
+  opacity: 1;
+  visibility: visible;
+}
+.contribution-locker-text{
+  max-width: 420px;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+.contribution-locker .btn{
+  min-width: 180px;
+}
 .site-footer.compact{ padding: 24px; text-align: center; background: transparent; }
 .site-footer.compact .footer-made{ margin: 0; color: var(--text-secondary); }
 

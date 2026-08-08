@@ -12,6 +12,10 @@
 </head>
 <body>
 <main class="page-shell">
+  <div id="contributionLocker" class="contribution-locker is-visible">
+    <p class="contribution-locker-text" id="lockStatus">This page is password protected. Enter the password to continue.</p>
+    <button id="unlockButton" class="btn btn-primary">Enter Password</button>
+  </div>
   <section class="hero hero-small">
     <div class="hero-content">
       <p class="eyebrow eyebrow-mono">// CELEBRATION HIGHLIGHTS</p>
@@ -141,24 +145,70 @@
       section.innerHTML = `<p class="section-desc">${escapeHtml(message)}</p>`;
     }
 
-    fetch(`${apiBaseUrl}/api/contributions`, { mode: 'cors' })
-      .then(res => res.json())
-      .then(data => {
-        if (!data?.success) throw new Error(data?.message || 'Could not load contributions.');
-        const contributions = data.data || {};
-        totalWishes.textContent = contributions.counts?.wishes ?? 0;
-        totalGifts.textContent = contributions.counts?.gifts ?? 0;
-        const wishes = contributions.wishes || [];
-        const gifts = contributions.gifts || [];
-        wishesList.innerHTML = wishes.length ? wishes.map(renderMessageCard).join('') : '<p class="section-desc">No wishes yet.</p>';
-        giftsList.innerHTML = gifts.length ? gifts.map(renderGiftCard).join('') : '<p class="section-desc">No confirmed gifts yet.</p>';
+    const locker = document.getElementById('contributionLocker');
+    const lockStatus = document.getElementById('lockStatus');
+    const unlockButton = document.getElementById('unlockButton');
+
+    function showLocked(message) {
+      if (locker) locker.classList.add('is-visible');
+      if (lockStatus) lockStatus.textContent = message;
+    }
+
+    function hideLock() {
+      if (locker) locker.classList.remove('is-visible');
+    }
+
+    function fetchContributions(password) {
+      fetch(`${apiBaseUrl}/api/contributions`, {
+        mode: 'cors',
+        headers: {
+          'X-Admin-Token': password,
+        },
       })
-      .catch(err => {
-        renderEmpty(wishesList, 'Unable to load wishes right now.');
-        renderEmpty(giftsList, 'Unable to load gifts right now.');
-        showToast('failed', 'Could not retrieve live contributions.');
-        console.error(err);
-      });
+        .then((res) => {
+          if (res.status === 401) {
+            throw new Error('Unauthorized');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (!data?.success) throw new Error(data?.message || 'Could not load contributions.');
+          hideLock();
+          const contributions = data.data || {};
+          totalWishes.textContent = contributions.counts?.wishes ?? 0;
+          totalGifts.textContent = contributions.counts?.gifts ?? 0;
+          const wishes = contributions.wishes || [];
+          const gifts = contributions.gifts || [];
+          wishesList.innerHTML = wishes.length ? wishes.map(renderMessageCard).join('') : '<p class="section-desc">No wishes yet.</p>';
+          giftsList.innerHTML = gifts.length ? gifts.map(renderGiftCard).join('') : '<p class="section-desc">No confirmed gifts yet.</p>';
+        })
+        .catch((err) => {
+          renderEmpty(wishesList, 'Unable to load wishes right now.');
+          renderEmpty(giftsList, 'Unable to load gifts right now.');
+          if (err.message === 'Unauthorized') {
+            showLocked('Password incorrect. Try again.');
+          } else {
+            showLocked('This page is password protected. Enter the password to continue.');
+            showToast('failed', 'Could not retrieve live contributions.');
+          }
+          console.error(err);
+        });
+    }
+
+    function promptForPassword() {
+      const password = window.prompt('Enter password to view contributions:');
+      if (!password) {
+        showLocked('This page is password protected. Enter the password to continue.');
+        return;
+      }
+      fetchContributions(password);
+    }
+
+    if (unlockButton) {
+      unlockButton.addEventListener('click', promptForPassword);
+    }
+
+    promptForPassword();
   });
 </script>
 </body>

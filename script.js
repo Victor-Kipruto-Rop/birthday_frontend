@@ -432,7 +432,7 @@ function initCountdown() {
       }
     });
     previous = values;
-    caption.textContent = `Every second brings us closer to celebrating ${CONFIG.celebrantName}.`;
+    caption.textContent = 'Counting down to the end of the day.';
   }
 
   if (Date.now() >= target) {
@@ -661,8 +661,7 @@ function initGiftForm() {
         await pollPaymentStatus(transactionId);
       } else {
         // No transaction id returned — show the result once as a toast.
-        showToast('success', 'Payment request sent successfully. Thank you for your gift!');
-        launchConfetti(60);
+        celebrateSuccess();
         trackEvent('gift_success', { amount });
       }
       form.reset();
@@ -735,11 +734,11 @@ function initWishForm() {
         body: JSON.stringify({ name, phone: normalizePhone(phone), message }),
         timeoutMs: 2000,
       });
-      showToast('success', 'Your birthday wish was sent successfully. Thank you!');
+      celebrateSuccess();
       form.reset();
     } catch (err) {
       const message = err?.name === 'AbortError'
-        ? 'Your wish could not be confirmed within two seconds. Please try again shortly.'
+        ? 'Your wish could not be confirmed. Please try again shortly.'
         : describeRequestError(err);
       showToast('failed', message);
     } finally {
@@ -818,12 +817,10 @@ async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
   }
 
   if (!quiet && attempts < ADVICE_AFTER_ATTEMPTS) {
-    const elapsedSeconds = Math.round((attempts * INTERVAL_MS) / 1000);
-    const countdownMsg = attempts > 0 ? `${waitingMessageFor(attempts)} (${elapsedSeconds}s)` : waitingMessageFor(attempts);
-    showPaymentStatus('waiting', countdownMsg);
+    showPaymentStatus('waiting', waitingMessageFor(attempts));
   } else if (!quiet) {
     showPaymentStatus('pending', 'No final response yet. You can check again or wait for the result.');
-    showToast('info', 'The prompt was not confirmed within three seconds. We will keep checking quietly.');
+    showToast('info', 'We are still checking quietly. You can check again later.');
     quiet = true;
   }
 
@@ -851,8 +848,7 @@ async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
     if (outcome === 'success') {
       console.log(`✅ [${pollLabel}] SUCCESS`);
       clearPendingPayment(transactionId);
-      showToast('success', `Payment successful. Reference: ${transactionId}`);
-      launchConfetti(60);
+      celebrateSuccess();
       trackEvent('gift_success');
       return;
     }
@@ -887,8 +883,7 @@ async function recheckPaymentStatus() {
 
     if (outcome === 'success') {
       clearPendingPayment(lastPolledTransactionId);
-      showToast('success', `Payment successful. Reference: ${lastPolledTransactionId}`);
-      launchConfetti(60);
+      celebrateSuccess();
       trackEvent('gift_success');
     } else if (outcome === 'cancelled') {
       clearPendingPayment(lastPolledTransactionId);
@@ -970,6 +965,36 @@ function launchConfetti(count = 40) {
     root.appendChild(piece);
     setTimeout(() => piece.remove(), 5000);
   }
+}
+
+function launchCelebrationEffects(count = 22) {
+  if (prefersReducedMotion) return;
+  const root = $('#celebrationRoot');
+  if (!root) return;
+
+  const variants = ['balloon', 'flower', 'gift'];
+
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement('div');
+    const variant = variants[Math.floor(Math.random() * variants.length)];
+    particle.className = `celebration-particle celebration-${variant}`;
+    const size = 18 + Math.random() * 22;
+    particle.style.left = `${Math.random() * 100}%`;
+    particle.style.width = `${size}px`;
+    particle.style.height = `${size}px`;
+    particle.style.opacity = `${0.8 + Math.random() * 0.2}`;
+    particle.style.animationDuration = `${3.2 + Math.random() * 1.8}s`;
+    particle.style.animationDelay = `${Math.random() * 0.6}s`;
+    particle.style.transform = `translateX(${(-14 + Math.random() * 28)}px)`;
+    root.appendChild(particle);
+    setTimeout(() => particle.remove(), 7000);
+  }
+}
+
+function celebrateSuccess() {
+  showToast('success', 'Success! Thank you for celebrating.');
+  launchConfetti(48);
+  launchCelebrationEffects(18);
 }
 
 /* ==========================================================================

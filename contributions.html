@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Birthday Contributions</title>
+<meta name="description" content="See the real birthday wishes and gifts that have been sent." />
+<meta name="theme-color" content="#0A0A0E" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero hero-small">
+    <div class="hero-content">
+      <p class="eyebrow eyebrow-mono">// CELEBRATION HIGHLIGHTS</p>
+      <h1 class="hero-title">Real Wishes & Gifts</h1>
+      <p class="hero-subtitle">Live contributions recorded from the birthday page.</p>
+      <div class="hero-actions">
+        <a href="index.html" class="btn btn-ghost">Return Home</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="contributions-summary glass">
+    <div class="contributions-summary-inner">
+      <div>
+        <p class="section-eyebrow">Total wishes</p>
+        <strong id="totalWishes">0</strong>
+      </div>
+      <div>
+        <p class="section-eyebrow">Successful gifts</p>
+        <strong id="totalGifts">0</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="contributions-grid">
+    <div class="contribution-panel glass">
+      <div class="section-head">
+        <p class="section-eyebrow">Birthday Wishes</p>
+        <h2 class="section-title">Messages sent by friends</h2>
+      </div>
+      <div id="wishesList" class="contribution-list">
+        <p class="section-desc">Loading wishes...</p>
+      </div>
+    </div>
+
+    <div class="contribution-panel glass">
+      <div class="section-head">
+        <p class="section-eyebrow">Gift Contributions</p>
+        <h2 class="section-title">Completed M-Pesa gifts</h2>
+      </div>
+      <div id="giftsList" class="contribution-list">
+        <p class="section-desc">Loading gifts...</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="contribution-note glass">
+    <p>No mocked data — this page displays actual wishes and confirmed gifts stored by the backend.</p>
+  </section>
+</main>
+
+<footer class="site-footer compact">
+  <p class="footer-made">Thanks for celebrating with Rop.</p>
+</footer>
+
+<div class="site-toast" id="siteToast" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <span class="site-toast-icon" id="siteToastIcon" aria-hidden="true"></span>
+  <span class="site-toast-message" id="siteToastMessage"></span>
+  <button class="site-toast-close" id="siteToastClose" type="button" aria-label="Close notification">✕</button>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const apiBaseUrl = 'https://birthday-backend-s1b7.onrender.com';
+    const wishesList = document.getElementById('wishesList');
+    const giftsList = document.getElementById('giftsList');
+    const totalWishes = document.getElementById('totalWishes');
+    const totalGifts = document.getElementById('totalGifts');
+
+    function renderMessageCard(wish) {
+      return `
+        <article class="contribution-card">
+          <div class="contribution-card-header">
+            <span class="contribution-name">${escapeHtml(wish.name)}</span>
+            <span class="contribution-time">${formatDate(wish.created_at)}</span>
+          </div>
+          <p>${escapeHtml(wish.message)}</p>
+        </article>
+      `;
+    }
+
+    function renderGiftCard(gift) {
+      return `
+        <article class="contribution-card">
+          <div class="contribution-card-header">
+            <span class="contribution-name">${escapeHtml(gift.name)}</span>
+            <span class="contribution-time">${formatDate(gift.created_at)}</span>
+          </div>
+          <p>Amount: KES ${Number(gift.amount).toLocaleString()}</p>
+        </article>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDate(value) {
+      if (!value) return 'Unknown';
+      try {
+        return new Intl.DateTimeFormat('en-GB', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+        }).format(new Date(value));
+      } catch {
+        return String(value);
+      }
+    }
+
+    function showToast(type, message) {
+      const toast = document.getElementById('siteToast');
+      const icon = document.getElementById('siteToastIcon');
+      const messageEl = document.getElementById('siteToastMessage');
+      if (!toast || !icon || !messageEl) return;
+      toast.className = `site-toast toast-${type}`;
+      icon.textContent = type === 'success' ? '✓' : type === 'failed' ? '✕' : 'ℹ';
+      messageEl.textContent = message;
+      toast.hidden = false;
+      setTimeout(() => { toast.hidden = true; }, 3800);
+    }
+
+    function renderEmpty(section, message) {
+      section.innerHTML = `<p class="section-desc">${escapeHtml(message)}</p>`;
+    }
+
+    fetch(`${apiBaseUrl}/api/contributions`, { mode: 'cors' })
+      .then(res => res.json())
+      .then(data => {
+        if (!data?.success) throw new Error(data?.message || 'Could not load contributions.');
+        const contributions = data.data || {};
+        totalWishes.textContent = contributions.counts?.wishes ?? 0;
+        totalGifts.textContent = contributions.counts?.gifts ?? 0;
+        const wishes = contributions.wishes || [];
+        const gifts = contributions.gifts || [];
+        wishesList.innerHTML = wishes.length ? wishes.map(renderMessageCard).join('') : '<p class="section-desc">No wishes yet.</p>';
+        giftsList.innerHTML = gifts.length ? gifts.map(renderGiftCard).join('') : '<p class="section-desc">No confirmed gifts yet.</p>';
+      })
+      .catch(err => {
+        renderEmpty(wishesList, 'Unable to load wishes right now.');
+        renderEmpty(giftsList, 'Unable to load gifts right now.');
+        showToast('failed', 'Could not retrieve live contributions.');
+        console.error(err);
+      });
+  });
+</script>
+</body>
+</html>

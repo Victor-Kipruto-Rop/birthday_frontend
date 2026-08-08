@@ -697,16 +697,49 @@ textarea.field-input{ resize: vertical; min-height: 100px; }
    CONFETTI
    ========================================================================== */
 .confetti-root{ position: fixed; inset: 0; z-index: 950; pointer-events: none; overflow: hidden; }
+.celebration-root{ position: fixed; inset: 0; z-index: 945; pointer-events: none; overflow: hidden; }
 .confetti-piece{
   position: absolute; top: -10px; border-radius: 2px; opacity: 0.95;
   animation: confetti-fall linear forwards;
 }
-@keyframes confetti-fall{
-  to{ transform: translateY(110vh) rotate(600deg); opacity: 0.2; }
+.celebration-particle{
+  position: absolute; top: 0; opacity: 0.95; transform-origin: center;
+  animation: celebration-rise linear forwards;
 }
-
-/* ==========================================================================
-   RESPONSIVE
+.celebration-balloon{
+  border-radius: 50% 50% 48% 48%; background: radial-gradient(circle at 30% 30%, #ffd166, #f59e0b);
+  box-shadow: inset -2px -4px 12px rgba(0,0,0,0.12);
+}
+.celebration-flower{
+  border-radius: 50%; background: radial-gradient(circle at 50% 40%, #ffffff, #ffb020 45%, #ff6200 70%);
+  box-shadow: 0 0 12px rgba(255, 140, 0, 0.2);
+}
+.celebration-gift{
+  border-radius: 16%;
+  background: linear-gradient(180deg, #00e676 0%, #11b96c 100%);
+  box-shadow: 0 0 18px rgba(0, 230, 118, 0.22);
+}
+.celebration-gift::before,
+.celebration-gift::after{
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 14px; height: 100%;
+  background: rgba(255,255,255,0.38);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.celebration-gift::after{ transform: translate(-50%, -50%) rotate(-45deg); }
+@keyframes celebration-rise{
+  0%{ transform: translateY(0) scale(0.85); opacity: 0.9; }
+  80%{ transform: translateY(-120vh) scale(1); opacity: 0.8; }
+  100%{ transform: translateY(-140vh) scale(1.05); opacity: 0; }
+}
+@media (max-width: 720px){
+  :root{ --section-pad: 64px; }
+  .countdown-grid{ gap: 10px; }
+  .music-panel{ display: none; }
+  .balloon-3{ display: none; }
+}
    ========================================================================== */
 @media (max-width: 720px){
   :root{ --section-pad: 64px; }
@@ -828,6 +861,36 @@ section{ padding-left: clamp(20px, 5vw, 64px); padding-right: clamp(20px, 5vw, 6
 .music-ring{ border-color: rgba(57,242,154,0.55); }
 .volume-slider::-webkit-slider-thumb, .volume-slider::-moz-range-thumb{ background: var(--green); }
 .scroll-progress{ background: linear-gradient(90deg, var(--green-deep), var(--green), var(--amber)); }
+
+/* Contributions page specific styles */
+.page-shell{ max-width: 1080px; margin: 0 auto; padding: 60px 24px 80px; }
+.hero-small{ padding-top: 64px; padding-bottom: 40px; background: radial-gradient(circle at top left, rgba(0,230,118,0.18), transparent 32%), linear-gradient(180deg, rgba(10,10,14,0.98) 0%, rgba(10,10,14,0.9) 100%); border-radius: 28px; box-shadow: 0 24px 80px rgba(0,0,0,0.45); margin-bottom: 40px; }
+.hero-small .hero-content{ max-width: 720px; margin: 0 auto; }
+.contributions-summary{ padding: 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+.contributions-summary-inner{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.contributions-summary-inner > div{ padding: 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; }
+.contributions-summary-inner strong{ display: block; margin-top: 8px; font-size: 3rem; color: var(--green); }
+.contributions-grid{ display: grid; grid-template-columns: 1.2fr 0.9fr; gap: 24px; margin-bottom: 32px; }
+.contribution-panel{ padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.contribution-list{ display: grid; gap: 18px; }
+.contribution-card{ padding: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; }
+.contribution-card-header{ display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 14px; }
+.contribution-name{ font-size: 1rem; font-weight: 600; color: var(--white); }
+.contribution-time{ font-size: 0.84rem; color: var(--text-secondary); white-space: nowrap; }
+.contribution-note{ padding: 24px; text-align: center; color: var(--text-secondary); }
+.site-footer.compact{ padding: 24px; text-align: center; background: transparent; }
+.site-footer.compact .footer-made{ margin: 0; color: var(--text-secondary); }
+
+@media (max-width: 860px){
+  .contributions-grid{ grid-template-columns: 1fr; }
+  .contributions-summary-inner{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px){
+  .page-shell{ padding: 30px 16px 40px; }
+  .contribution-card{ padding: 18px; }
+  .contributions-summary{ padding: 20px; }
+}
 
 @media (max-width: 720px){
   section{ padding-top: 76px; padding-bottom: 76px; }

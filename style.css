@@ -771,10 +771,19 @@ section{ padding-left: clamp(20px, 5vw, 64px); padding-right: clamp(20px, 5vw, 6
 }
 .hero-title{ font-size: clamp(44px, 8.5vw, 92px); letter-spacing: -0.045em; }
 .hero-name{
+  position: relative;
+  display: inline-block;
   color: var(--white);
   -webkit-text-fill-color: var(--white);
   background: none;
   animation: none;
+}
+.name-flower{
+  position: absolute; top: -0.12em; right: -0.42em;
+  color: var(--green); -webkit-text-fill-color: var(--green);
+  font-size: 0.28em; line-height: 1;
+  filter: drop-shadow(0 0 7px rgba(57,242,154,0.45));
+  transform: rotate(12deg);
 }
 .hero-subtitle{ max-width: 580px; font-size: clamp(16px, 2vw, 19px); line-height: 1.7; }
 .hero-actions{ margin-top: 34px; }

@@ -733,12 +733,15 @@ function initWishForm() {
       await apiRequest('/api/wish', {
         method: 'POST',
         body: JSON.stringify({ name, phone: normalizePhone(phone), message }),
-        timeoutMs: 9000,
+        timeoutMs: 2000,
       });
       showToast('success', 'Your birthday wish was sent successfully. Thank you!');
       form.reset();
     } catch (err) {
-      showToast('failed', describeRequestError(err));
+      const message = err?.name === 'AbortError'
+        ? 'Your wish could not be confirmed within two seconds. Please try again shortly.'
+        : describeRequestError(err);
+      showToast('failed', message);
     } finally {
       submitBtn.classList.remove('is-loading');
       if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {

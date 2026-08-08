@@ -97,6 +97,10 @@ function showToast(type, message, duration = 3200) {
   const messageEl = $('#siteToastMessage');
   if (!toast || !icon || !messageEl) return;
 
+  if (type === 'success' || type === 'failed') {
+    $('#paymentStatus')?.classList.remove('is-visible');
+    clearTimeout(showPaymentStatus.dismissTimer);
+  }
   clearTimeout(showToast.dismissTimer);
   toast.className = `site-toast toast-${type}`;
   icon.textContent = type === 'success' ? '✓' : type === 'failed' ? '✕' : 'ℹ';
@@ -604,8 +608,7 @@ function initGiftForm() {
       if (transactionId) {
         await pollPaymentStatus(transactionId);
       } else {
-        // No transaction id returned — treat the initial request as sufficient confirmation.
-        showPaymentStatus('success', 'Payment request sent. Thank you for your gift!');
+        // No transaction id returned — show the result once as a toast.
         showToast('success', 'Payment request sent successfully. Thank you for your gift!');
         launchConfetti(60);
         trackEvent('gift_success', { amount });
@@ -618,7 +621,6 @@ function initGiftForm() {
       const message = err?.name === 'AbortError'
         ? 'Sending the M-Pesa prompt timed out. Please try again.'
         : describeRequestError(err);
-      showPaymentStatus('failed', message);
       showToast('failed', message);
       trackEvent('gift_failed', { amount });
     } finally {
@@ -706,14 +708,12 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
     if (outcome === 'failed') {
       console.log(`❌ [${pollLabel}] FAILED`);
-      showPaymentStatus('failed', 'Payment failed. Please try again.');
       showToast('failed', 'Payment failed. Please try again.');
       trackEvent('gift_failed');
       return;
     }
     if (outcome === 'success') {
       console.log(`✅ [${pollLabel}] SUCCESS`);
-      showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
       showToast('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
       trackEvent('gift_success');
@@ -749,12 +749,10 @@ async function recheckPaymentStatus() {
     const outcome = interpretPaymentStatus(res);
 
     if (outcome === 'success') {
-      showPaymentStatus('success', 'Payment successful. Thank you for your gift!');
       showToast('success', 'Payment successful. Thank you for your gift!');
       launchConfetti(60);
       trackEvent('gift_success');
     } else if (outcome === 'failed') {
-      showPaymentStatus('failed', 'Payment failed. Please try again.');
       showToast('failed', 'Payment failed. Please try again.');
       trackEvent('gift_failed');
     } else if (outcome === 'unrecognized-finalized') {

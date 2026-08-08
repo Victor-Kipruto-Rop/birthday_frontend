@@ -942,17 +942,6 @@ function initPaymentRecheck() {
   $('#paymentRecheck')?.addEventListener('click', recheckPaymentStatus);
 }
 
-async function resumePendingPayment() {
-  const saved = safeJSONParse(localStorage.getItem(PENDING_PAYMENT_KEY) || '');
-  if (!saved?.reference || Date.now() - Number(saved.savedAt || 0) > 24 * 60 * 60 * 1000) {
-    clearPendingPayment();
-    return;
-  }
-  lastPolledTransactionId = saved.reference;
-  showToast('info', `Checking your pending payment: ${saved.reference}`);
-  await pollPaymentStatus(saved.reference);
-}
-
 function initPaymentStatusClose() {
   $('#paymentClose')?.addEventListener('click', () => {
     clearTimeout(showPaymentStatus.dismissTimer);
@@ -1074,7 +1063,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPaymentStatusClose();
   initPaymentRecheck();
   initToast();
-  resumePendingPayment();
   warmUpBackend();
   trackEvent('page_view');
 });

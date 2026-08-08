@@ -797,10 +797,11 @@ function interpretPaymentStatus(res, pollLabel) {
   return 'pending';
 }
 
-async function pollPaymentStatus(transactionId, attempts = 0) {
-  // Poll quickly for a responsive result, then stop the blocking spinner
-  // after a short window. A pending transaction can still be checked again.
-  const MAX_ATTEMPTS = 6;
+async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
+  // Show the waiting state for three seconds, then continue checking quietly
+  // so a late success or cancellation still reaches the user immediately.
+  const ADVICE_AFTER_ATTEMPTS = 6;
+  const MAX_ATTEMPTS = 60;
   const INTERVAL_MS = 500;
   lastPolledTransactionId = transactionId;
 
@@ -813,9 +814,15 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
     return;
   }
 
-  const elapsedSeconds = Math.round((attempts * INTERVAL_MS) / 1000);
-  const countdownMsg = attempts > 0 ? `${waitingMessageFor(attempts)} (${elapsedSeconds}s)` : waitingMessageFor(attempts);
-  showPaymentStatus('waiting', countdownMsg);
+  if (!quiet && attempts < ADVICE_AFTER_ATTEMPTS) {
+    const elapsedSeconds = Math.round((attempts * INTERVAL_MS) / 1000);
+    const countdownMsg = attempts > 0 ? `${waitingMessageFor(attempts)} (${elapsedSeconds}s)` : waitingMessageFor(attempts);
+    showPaymentStatus('waiting', countdownMsg);
+  } else if (!quiet) {
+    showPaymentStatus('pending', 'No final response yet. You can check again or wait for the result.');
+    showToast('info', 'The prompt was not confirmed within three seconds. We will keep checking quietly.');
+    quiet = true;
+  }
 
   const pollLabel = `Payment Status Poll #${attempts + 1}`;
   try {
@@ -854,11 +861,11 @@ async function pollPaymentStatus(transactionId, attempts = 0) {
 
     console.log(`⏳ [${pollLabel}] Still pending, will retry...`);
     await new Promise(r => setTimeout(r, INTERVAL_MS));
-    return pollPaymentStatus(transactionId, attempts + 1);
+    return pollPaymentStatus(transactionId, attempts + 1, quiet);
   } catch (err) {
     console.log(`[${pollLabel}] Error (will retry):`, err.message);
     await new Promise(r => setTimeout(r, INTERVAL_MS));
-    return pollPaymentStatus(transactionId, attempts + 1);
+    return pollPaymentStatus(transactionId, attempts + 1, quiet);
   }
 }
 

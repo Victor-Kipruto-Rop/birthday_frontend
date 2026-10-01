@@ -875,6 +875,7 @@ let lastPolledTransactionId = null;
 // only means the backend is done processing, not that it succeeded.
 function interpretPaymentStatus(res, pollLabel) {
   const statusData = res?.data || {};
+  const event = String(statusData.event || '').toUpperCase();
   const rawStatus = statusData.status
     ?? statusData.Status
     ?? statusData.payment_status
@@ -887,6 +888,9 @@ function interpretPaymentStatus(res, pollLabel) {
   const successStates = ['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'];
   const failedStates = ['failed', 'cancelled', 'canceled', 'declined', 'error'];
 
+  if (event === 'CANCELLED') return 'cancelled';
+  if (event === 'SUCCESS') return 'success';
+  if (['INSUFFICIENT_FUNDS', 'INVALID_PIN', 'FAILED'].includes(event)) return 'failed';
   if (['cancelled', 'canceled'].includes(status) || ['cancelled', 'canceled'].includes(reason)) return 'cancelled';
   if (failedStates.includes(status)) return 'failed';
   if (successStates.includes(status)) return 'success';
@@ -995,14 +999,14 @@ async function recheckPaymentStatus() {
       trackEvent('gift_success');
     } else if (outcome === 'cancelled') {
       clearPendingPayment(lastPolledTransactionId);
-      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
+      showToast('failed', paymentStatusMessage(res, outcome));
       trackEvent('gift_cancelled');
     } else if (outcome === 'failed') {
       clearPendingPayment(lastPolledTransactionId);
-      showToast('failed', `Payment failed for ${lastPolledTransactionId}. Please try again.`);
+      showToast('failed', paymentStatusMessage(res, outcome));
       trackEvent('gift_failed');
     } else if (outcome === 'unrecognized-finalized') {
-      showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
+      showPaymentStatus('pending', paymentStatusMessage(res, outcome));
     } else {
       showPaymentStatus('pending', paymentStatusMessage(res, outcome));
     }

@@ -688,7 +688,10 @@ function initGiftForm() {
       // Response envelope is { success, message, data: { reference, phone, amount } }.
       const transactionId = initRes?.data?.reference;
 
-      showPaymentStatus('waiting', 'M-Pesa prompt sent. Enter your PIN to approve the gift...');
+      showPaymentStatus(
+        'waiting',
+        initRes?.data?.status_message || 'Check your phone for the M-Pesa prompt.',
+      );
 
       if (transactionId) {
         savePendingPayment(transactionId, amount);

@@ -1,1094 +1,302 @@
 'use strict';
 
-/* ==========================================================================
-   CONFIG — edit these values to personalize the site
-   ========================================================================== */
 const CONFIG = {
   celebrantName: 'Rop',
-  submissionCutoffISO: '2026-08-09T00:00:00+03:00', // midnight at the end of today (East Africa Time)
   apiBaseUrl: 'https://birthday-backend-s1b7.onrender.com',
-
-  // Optional: POST { event, meta } here for lightweight, non-blocking analytics.
-  // Leave as null to disable analytics calls entirely.
-  analyticsEndpoint: null, // e.g. 'https://birthday-backend-s1b7.onrender.com/api/analytics'
-
+  analyticsEndpoint: null,
   socialLinks: [
     { label: 'GitHub', href: 'https://github.com/Victor-Kipruto-Rop', external: true },
     { label: 'LinkedIn', href: 'https://www.linkedin.com/in/victor-kipruto-rop', external: true },
     { label: 'Email', href: 'mailto:kiprutovictor39@gmail.com', external: false },
   ],
-
 };
 
-/* ==========================================================================
-   UTILITIES
-   ========================================================================== */
-const $ = (sel, ctx = document) => ctx.querySelector(sel);
-const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (selector, context = document) => context.querySelector(selector);
+const $$ = (selector, context = document) => Array.from(context.querySelectorAll(selector));
 const PENDING_PAYMENT_KEY = 'birthday_pending_payment';
 
-function safeJSONParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
-}
-
-async function apiRequest(path, options = {}) {
-  const url = `${CONFIG.apiBaseUrl}${path}`;
-  const controller = new AbortController();
-  // Callers can override this timeout for payment operations so a stalled
-  // request fails fast instead of leaving the visitor behind a long spinner.
-  const { timeoutMs = 12000, ...fetchOptions } = options;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      ...fetchOptions,
-    });
-    clearTimeout(timeout);
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
-    }
-    return data;
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
-}
-
-// Pulls the first matching key from a response object, since backend field
-// naming can vary (snake_case vs camelCase) without a confirmed contract.
-function pickField(obj, keys) {
-  if (!obj) return undefined;
-  for (const key of keys) {
-    if (obj[key] !== undefined && obj[key] !== null) return obj[key];
-  }
-  return undefined;
-}
-
-// Turns a thrown error into a message that's safe to show a visitor.
-// Network-level failures (timeout, unreachable, CORS, DNS, etc.) never reveal
-// what actually went wrong — that's noise or confusing to a non-technical
-// visitor, and "the server is unreachable" is not something they can act on
-// anyway. Real validation errors from the backend (e.g. "invalid phone
-// number") still come through as-is since those ARE actionable.
-function describeRequestError(err) {
-  if (err && err.name === 'AbortError') {
-    return 'Something went wrong. Please try again later.';
-  }
-  if (err instanceof TypeError) {
-    return 'Something went wrong. Please try again later.';
-  }
-  if (err && err.message) {
-    return err.message;
-  }
-  return 'Something went wrong. Please try again later.';
-}
-
-function showToast(type, message, duration = 3200) {
+function showToast(type, message, duration = 4000) {
   const toast = $('#siteToast');
   const icon = $('#siteToastIcon');
   const messageEl = $('#siteToastMessage');
   if (!toast || !icon || !messageEl) return;
-
-  if (type === 'success' || type === 'failed') {
-    $('#paymentStatus')?.classList.remove('is-visible');
-    clearTimeout(showPaymentStatus.dismissTimer);
-  }
-  clearTimeout(showToast.dismissTimer);
   toast.className = `site-toast toast-${type}`;
   icon.textContent = type === 'success' ? '✓' : type === 'failed' ? '✕' : 'ℹ';
   messageEl.textContent = message;
   toast.hidden = false;
   requestAnimationFrame(() => toast.classList.add('is-visible'));
-  showToast.dismissTimer = setTimeout(() => {
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => {
     toast.classList.remove('is-visible');
     setTimeout(() => { toast.hidden = true; }, 220);
   }, duration);
 }
 
-function initToast() {
-  $('#siteToastClose')?.addEventListener('click', () => {
-    clearTimeout(showToast.dismissTimer);
-    const toast = $('#siteToast');
-    toast.classList.remove('is-visible');
-    setTimeout(() => { toast.hidden = true; }, 220);
-  });
-}
-
-function savePendingPayment(reference, amount) {
-  localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({ reference, amount, savedAt: Date.now() }));
-}
-
-function clearPendingPayment(reference = null) {
-  const saved = safeJSONParse(localStorage.getItem(PENDING_PAYMENT_KEY) || '');
-  if (!reference || saved?.reference === reference) localStorage.removeItem(PENDING_PAYMENT_KEY);
-}
-
-/* ==========================================================================
-   ANALYTICS (lightweight, privacy-friendly, opt-in via CONFIG.analyticsEndpoint)
-   ========================================================================== */
-function trackEvent(event, meta = {}) {
-  if (!CONFIG.analyticsEndpoint) return;
-  // Fire-and-forget: never blocks the UI, never throws to the caller.
-  fetch(CONFIG.analyticsEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, meta, path: window.location.pathname, ts: Date.now() }),
-    keepalive: true,
-  }).catch(() => { /* analytics failures are silently ignored */ });
-}
-
-/* ==========================================================================
-   LOADER
-   ========================================================================== */
-function initLoader() {
-  const loader = $('#loader');
-  const fill = $('#loaderBarFill');
-  const MIN_DISPLAY_MS = 1200;
-  const startTime = performance.now();
-  document.body.style.overflow = 'hidden';
-
-  // Creep the bar toward 85% while real assets are still loading, so it never
-  // looks stalled even if the network is slow.
-  let creepProgress = 0;
-  const creepInterval = setInterval(() => {
-    creepProgress = Math.min(85, creepProgress + Math.random() * 10);
-    fill.style.width = `${creepProgress}%`;
-  }, 220);
-
-  const windowLoaded = new Promise(resolve => {
-    if (document.readyState === 'complete') resolve();
-    else window.addEventListener('load', resolve, { once: true });
-  });
-  const fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-
-  Promise.all([windowLoaded, fontsReady]).then(() => {
-    clearInterval(creepInterval);
-    const elapsed = performance.now() - startTime;
-    const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
-    fill.style.width = '100%';
-    setTimeout(() => {
-      loader.classList.add('is-hidden');
-      document.body.style.overflow = '';
-      startPostLoadAnimations();
-    }, remaining + 250);
-  });
-}
-
-function startPostLoadAnimations() {
-  document.body.style.overflow = '';
-  initRevealAnimations();
-}
-
-/* ==========================================================================
-   SCROLL REVEAL (Intersection Observer)
-   ========================================================================== */
-function initRevealAnimations() {
-  const targets = $$('.reveal-up');
-  if (!('IntersectionObserver' in window) || prefersReducedMotion) {
-    targets.forEach(el => el.classList.add('is-visible'));
-    return;
-  }
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const delay = entry.target.dataset.delay;
-        if (delay) entry.target.style.setProperty('--delay', delay);
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      }
+async function apiRequest(path, options = {}) {
+  const { timeoutMs = 30000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json', ...(fetchOptions.headers || {}) },
+      signal: controller.signal,
+      ...fetchOptions,
     });
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-  targets.forEach(el => observer.observe(el));
-}
-
-/* ==========================================================================
-   SCROLL PROGRESS + BACK TO TOP + SCROLL INDICATOR
-   ========================================================================== */
-function initScrollUI() {
-  const progressBar = $('#scrollProgress');
-  const backToTop = $('#backToTop');
-
-  function onScroll() {
-    const scrollTop = window.scrollY;
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-    progressBar.style.width = `${pct}%`;
-    backToTop.classList.toggle('is-visible', scrollTop > 500);
-  }
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  backToTop.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-  });
-
-  $('#scrollIndicator')?.addEventListener('click', () => {
-    $('#countdown')?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-  });
-}
-
-/* ==========================================================================
-   FALLING PETALS (canvas)
-   ========================================================================== */
-function initPetals() {
-  const canvas = $('#petalsCanvas');
-  if (!canvas || prefersReducedMotion) return;
-  const ctx = canvas.getContext('2d');
-  let width, height, petals = [];
-  const PETAL_COUNT = window.innerWidth < 640 ? 14 : 26;
-  const colors = ['#00E676', '#FFB020', '#FF8800', '#6EE7B7', '#FFE29A'];
-
-  function resize() {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  function makePetal(initial) {
-    return {
-      x: Math.random() * width,
-      y: initial ? Math.random() * height : -20,
-      size: 6 + Math.random() * 10,
-      speedY: 0.4 + Math.random() * 1.1,
-      speedX: (Math.random() - 0.5) * 0.6,
-      rotation: Math.random() * 360,
-      rotationSpeed: (Math.random() - 0.5) * 2,
-      sway: Math.random() * Math.PI * 2,
-      swaySpeed: 0.01 + Math.random() * 0.02,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      opacity: 0.5 + Math.random() * 0.4,
-    };
-  }
-
-  for (let i = 0; i < PETAL_COUNT; i++) petals.push(makePetal(true));
-
-  function drawPetal(p) {
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate((p.rotation * Math.PI) / 180);
-    ctx.globalAlpha = p.opacity;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, p.size, p.size * 0.6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function animate() {
-    ctx.clearRect(0, 0, width, height);
-    petals.forEach(p => {
-      p.sway += p.swaySpeed;
-      p.y += p.speedY;
-      p.x += p.speedX + Math.sin(p.sway) * 0.6;
-      p.rotation += p.rotationSpeed;
-      if (p.y > height + 20) Object.assign(p, makePetal(false));
-      drawPetal(p);
-    });
-    requestAnimationFrame(animate);
-  }
-  animate();
-}
-
-/* ==========================================================================
-   SPARKLES + FLOATING HEARTS (ambient DOM particles)
-   ========================================================================== */
-function initSparkles() {
-  const layer = $('#sparkles');
-  if (!layer || prefersReducedMotion) return;
-  const COUNT = window.innerWidth < 640 ? 12 : 24;
-  for (let i = 0; i < COUNT; i++) {
-    const s = document.createElement('span');
-    s.className = 'sparkle';
-    s.style.left = `${Math.random() * 100}%`;
-    s.style.top = `${Math.random() * 100}%`;
-    s.style.animationDelay = `${Math.random() * 3}s`;
-    s.style.animationDuration = `${2 + Math.random() * 2.5}s`;
-    layer.appendChild(s);
-  }
-}
-
-function initFloatingHearts() {
-  const layer = $('#hearts');
-  if (!layer || prefersReducedMotion) return;
-  function spawnHeart() {
-    const h = document.createElement('span');
-    h.className = 'float-heart';
-    h.textContent = '♥';
-    h.style.left = `${Math.random() * 100}%`;
-    h.style.fontSize = `${14 + Math.random() * 14}px`;
-    const duration = 8 + Math.random() * 6;
-    h.style.animationDuration = `${duration}s`;
-    layer.appendChild(h);
-    setTimeout(() => h.remove(), duration * 1000 + 500);
-  }
-  setInterval(spawnHeart, 3500);
-  spawnHeart();
-}
-
-/* ==========================================================================
-   MUSIC PLAYER
-   ========================================================================== */
-function initMusicPlayer() {
-  const player = $('#musicPlayer');
-  const toggle = $('#musicToggle');
-  const audio = $('#bgMusic');
-  const volumeSlider = $('#volumeSlider');
-
-  audio.volume = Number(volumeSlider.value) / 100;
-
-  function fadeAudio(target, duration = 600) {
-    const start = audio.volume;
-    const startTime = performance.now();
-    function step(now) {
-      const t = Math.min(1, (now - startTime) / duration);
-      audio.volume = start + (target - start) * t;
-      if (t < 1) requestAnimationFrame(step);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
     }
-    requestAnimationFrame(step);
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
-
-  function playMusic() {
-    audio.volume = 0;
-    audio.play().then(() => {
-      fadeAudio(Number(volumeSlider.value) / 100);
-      toggle.classList.add('is-playing');
-      toggle.setAttribute('aria-pressed', 'true');
-      toggle.setAttribute('aria-label', 'Pause birthday music');
-    }).catch(() => {
-      showToast('failed', 'Music could not be played. Please try again.');
-    });
-  }
-
-  function pauseMusic() {
-    fadeAudio(0, 400);
-    setTimeout(() => audio.pause(), 420);
-    toggle.classList.remove('is-playing');
-    toggle.setAttribute('aria-pressed', 'false');
-    toggle.setAttribute('aria-label', 'Play birthday music');
-  }
-
-  toggle.addEventListener('click', () => {
-    player.classList.add('is-active');
-    if (audio.paused) playMusic(); else pauseMusic();
-  });
-
-  volumeSlider.addEventListener('input', () => {
-    audio.volume = Number(volumeSlider.value) / 100;
-  });
-
-  // Playback is intentionally started only by the dedicated music button.
-  // Generic page clicks, key presses, and opening the link never start audio.
-}
-
-/* ==========================================================================
-   COUNTDOWN
-   ========================================================================== */
-function initCountdown() {
-  const target = new Date(CONFIG.submissionCutoffISO).getTime();
-  const els = {
-    days: $('#cd-days'), hours: $('#cd-hours'), minutes: $('#cd-minutes'), seconds: $('#cd-seconds'),
-  };
-  const caption = $('#countdownCaption');
-  let previous = {};
-  let timer;
-
-  function pad(n) { return String(n).padStart(2, '0'); }
-
-  function update() {
-    const now = Date.now();
-    const diff = target - now;
-
-    if (diff <= 0) {
-      els.days.textContent = '00';
-      els.hours.textContent = '00';
-      els.minutes.textContent = '00';
-      els.seconds.textContent = '00';
-      caption.textContent = 'The window for sending gifts and wishes has closed. Thank you for celebrating!';
-      setSubmissionClosed();
-      showToast('info', 'Gifts and wishes are no longer being accepted.');
-      clearInterval(timer);
-      return;
-    }
-
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-
-    const values = { days: pad(days), hours: pad(hours), minutes: pad(minutes), seconds: pad(seconds) };
-    Object.entries(values).forEach(([key, val]) => {
-      if (previous[key] !== val) {
-        els[key].textContent = val;
-        if (!prefersReducedMotion) {
-          els[key].classList.remove('is-flipping');
-          void els[key].offsetWidth;
-          els[key].classList.add('is-flipping');
-        }
-      }
-    });
-    previous = values;
-    caption.textContent = 'Counting down to the end of the day.';
-  }
-
-  if (Date.now() >= target) {
-    update();
-    return;
-  }
-  update();
-  timer = setInterval(update, 1000);
-}
-
-function setSubmissionClosed() {
-  const wishLink = $('#wishLink');
-  const giftLink = $('#giftLink');
-  const form = $('#giftForm');
-  const submitBtn = $('#giftSubmitBtn');
-  const closedMessage = $('#submissionClosedMessage');
-  const wishForm = $('#wishForm');
-  const wishSubmitBtn = $('#wishSubmitBtn');
-
-  [wishLink, giftLink].forEach(link => {
-    if (!link) return;
-    link.classList.add('is-disabled');
-    link.setAttribute('aria-disabled', 'true');
-    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
-  });
-  if (form) form.classList.add('is-disabled');
-  if (submitBtn) submitBtn.disabled = true;
-  if (wishForm) wishForm.classList.add('is-disabled');
-  if (wishSubmitBtn) wishSubmitBtn.disabled = true;
-  if (closedMessage) closedMessage.hidden = false;
-}
-
-/* ==========================================================================
-   MAGNETIC BUTTONS
-   ========================================================================== */
-function initMagneticButtons() {
-  if (prefersReducedMotion) return;
-  $$('.magnetic').forEach(btn => {
-    btn.addEventListener('mousemove', (e) => {
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - rect.left - rect.width / 2;
-      const y = e.clientY - rect.top - rect.height / 2;
-      btn.style.transform = `translate(${x * 0.18}px, ${y * 0.3}px)`;
-    });
-    btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
-  });
-}
-
-/* ==========================================================================
-   FORM VALIDATION HELPERS
-   ========================================================================== */
-function setFieldError(fieldId, errorId, message) {
-  const field = document.getElementById(fieldId).closest('.field');
-  const errorEl = document.getElementById(errorId);
-  if (message) {
-    field.classList.add('has-error');
-    errorEl.textContent = message;
-  } else {
-    field.classList.remove('has-error');
-    errorEl.textContent = '';
-  }
-}
-
-function isValidPhone(value) {
-  const cleaned = value.replace(/\s+/g, '');
-  return /^(?:\+254|254|0)?7\d{8}$/.test(cleaned) || /^(?:\+254|254|0)?1\d{8}$/.test(cleaned);
 }
 
 function normalizePhone(value) {
-  let cleaned = value.replace(/\s+/g, '');
-  if (cleaned.startsWith('0')) cleaned = `254${cleaned.slice(1)}`;
-  if (cleaned.startsWith('+')) cleaned = cleaned.slice(1);
-  return cleaned;
+  let phone = value.replace(/\s+/g, '');
+  if (phone.startsWith('+')) phone = phone.slice(1);
+  if (phone.startsWith('0')) phone = `254${phone.slice(1)}`;
+  return phone;
 }
 
-/* ==========================================================================
-   SPAM PROTECTION
-   Two lightweight, no-backend-changes-required signals:
-   1. Honeypot field — real visitors never see or fill it, most bots do.
-   2. Minimum time-on-form — a submission faster than a human could type
-      is treated as automated.
-   ========================================================================== */
-const formRenderTimes = new WeakMap();
-function markFormRendered(form) { formRenderTimes.set(form, Date.now()); }
-function isLikelyBot(form, honeypotInput) {
-  if (honeypotInput && honeypotInput.value.trim() !== '') return true;
-  const renderedAt = formRenderTimes.get(form);
-  if (renderedAt && Date.now() - renderedAt < 1500) return true;
-  return false;
+function isValidPhone(value) {
+  return /^(?:\+254|254|0)?[17]\d{8}$/.test(value.replace(/\s+/g, ''));
 }
 
-let confirmationResolve = null;
-
-function requestPaymentConfirmation(amount) {
-  const modal = $('#paymentConfirmation');
-  const amountEl = $('#confirmationAmount');
-  if (!modal || !amountEl) return Promise.resolve(true);
-
-  amountEl.textContent = `KES ${amount.toLocaleString('en-KE')}`;
-  modal.hidden = false;
-  document.body.classList.add('confirmation-open');
-  $('#confirmationProceed')?.focus();
-
-  return new Promise(resolve => {
-    confirmationResolve = resolve;
-  });
+function setFieldError(fieldId, errorId, message) {
+  const field = document.getElementById(fieldId)?.closest('.field');
+  const error = document.getElementById(errorId);
+  if (!field || !error) return;
+  field.classList.toggle('has-error', Boolean(message));
+  error.textContent = message || '';
 }
 
-function closePaymentConfirmation(confirmed) {
-  const modal = $('#paymentConfirmation');
-  if (!modal || !confirmationResolve) return;
-
-  modal.hidden = true;
-  document.body.classList.remove('confirmation-open');
-  const resolve = confirmationResolve;
-  confirmationResolve = null;
-  resolve(confirmed);
+function setButtonLoading(button, loading) {
+  button.classList.toggle('is-loading', loading);
+  button.disabled = loading;
 }
 
-function initPaymentConfirmation() {
-  $('#confirmationProceed')?.addEventListener('click', () => closePaymentConfirmation(true));
-  $('#confirmationCancel')?.addEventListener('click', () => closePaymentConfirmation(false));
-  $('#confirmationClose')?.addEventListener('click', () => closePaymentConfirmation(false));
-  $('#paymentConfirmation')?.addEventListener('click', (event) => {
-    if (event.target.id === 'paymentConfirmation') closePaymentConfirmation(false);
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !$('#paymentConfirmation')?.hidden) {
-      closePaymentConfirmation(false);
-    }
-  });
-}
-
-/* ==========================================================================
-   GIFT / PAYMENT FORM
-   ========================================================================== */
-function initGiftForm() {
-  const form = $('#giftForm');
-  if (!form) return;
-  const amountInput = $('#giftAmount');
-  const phoneInput = $('#giftPhone');
-  const submitBtn = $('#giftSubmitBtn');
-  const chips = $$('.amount-chip');
-  const honeypot = $('#giftWebsite');
-  markFormRendered(form);
-
-  if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-    setSubmissionClosed();
-    return;
+function celebrateSuccess(message = 'Success! Thank you for celebrating.') {
+  showToast('success', message);
+  const root = $('#confettiRoot');
+  if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (let i = 0; i < 36; i += 1) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = ['#00E676', '#FFB020', '#FF8800', '#FFFFFF'][i % 4];
+    piece.style.animationDuration = `${2 + Math.random() * 2}s`;
+    root.appendChild(piece);
+    setTimeout(() => piece.remove(), 4500);
   }
-
-  // Second chance to warm the backend: if the page-load ping happened to
-  // fail (or the visitor waited a long time before interacting), this
-  // gives it another shot well before the real submission.
-  form.addEventListener('focusin', warmUpBackend, { once: true });
-
-  chips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      chips.forEach(c => c.classList.remove('is-selected'));
-      chip.classList.add('is-selected');
-      amountInput.value = chip.dataset.amount;
-      amountInput.dispatchEvent(new Event('input'));
-    });
-  });
-  amountInput.addEventListener('input', () => {
-    chips.forEach(c => c.classList.toggle('is-selected', c.dataset.amount === amountInput.value));
-  });
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-      setSubmissionClosed();
-      return;
-    }
-
-    if (isLikelyBot(form, honeypot)) return;
-
-    let valid = true;
-    const amount = Number(amountInput.value);
-    if (!amount || amount < 10) {
-      setFieldError('giftAmount', 'giftAmountError', 'Enter an amount of at least KES 10.');
-      valid = false;
-    } else setFieldError('giftAmount', 'giftAmountError', '');
-
-    if (!isValidPhone(phoneInput.value.trim())) {
-      setFieldError('giftPhone', 'giftPhoneError', 'Enter a valid M-Pesa phone number.');
-      valid = false;
-    } else setFieldError('giftPhone', 'giftPhoneError', '');
-
-    if (!valid) return;
-
-    const confirmed = await requestPaymentConfirmation(amount);
-    if (!confirmed) return;
-
-    submitBtn.classList.add('is-loading');
-    submitBtn.disabled = true;
-
-    showPaymentStatus('preparing', 'Preparing payment...');
-    trackEvent('gift_initiated', { amount });
-
-    const payload = { amount, phone: normalizePhone(phoneInput.value.trim()) };
-
-    // If the initial request takes a few seconds, show progress instead of
-    // leaving a static message that looks frozen.
-    const slowHint = setTimeout(() => {
-      showPaymentStatus('preparing', 'Still preparing your payment. Almost there...');
-    }, 6000);
-
-    try {
-      // Cap STK initiation so a stalled provider request fails fast and the
-      // visitor can retry instead of waiting behind an indefinite spinner.
-      const initRes = await apiRequest('/api/payment', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        timeoutMs: 9000,
-      });
-      clearTimeout(slowHint);
-      // Response envelope is { success, message, data: { reference, phone, amount } }.
-      const transactionId = initRes?.data?.reference;
-
-      showPaymentStatus('waiting', 'M-Pesa prompt sent. Enter your PIN to approve the gift...');
-
-      if (transactionId) {
-        savePendingPayment(transactionId, amount);
-        await pollPaymentStatus(transactionId);
-      } else {
-        // No transaction id returned — show the result once as a toast.
-        celebrateSuccess();
-        trackEvent('gift_success', { amount });
-      }
-      form.reset();
-      chips.forEach(c => c.classList.remove('is-selected'));
-    } catch (err) {
-      clearTimeout(slowHint);
-      console.error('Payment initiation failed:', err);
-      const message = err?.name === 'AbortError'
-        ? 'Sending the M-Pesa prompt timed out. Please try again.'
-        : describeRequestError(err);
-      showToast('failed', message);
-      trackEvent('gift_failed', { amount });
-    } finally {
-      submitBtn.classList.remove('is-loading');
-      if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-        setSubmissionClosed();
-      } else {
-        submitBtn.disabled = false;
-      }
-    }
-  });
 }
 
 function initWishForm() {
   const form = $('#wishForm');
   if (!form) return;
-  const nameInput = $('#wishName');
-  const phoneInput = $('#wishPhone');
-  const messageInput = $('#wishMessage');
-  const submitBtn = $('#wishSubmitBtn');
-  const honeypot = $('#wishWebsite');
-  markFormRendered(form);
-
-  if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-    setSubmissionClosed();
-    return;
-  }
+  const name = $('#wishName');
+  const phone = $('#wishPhone');
+  const message = $('#wishMessage');
+  const button = $('#wishSubmitBtn');
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-      setSubmissionClosed();
-      return;
-    }
-    if (isLikelyBot(form, honeypot)) return;
-
     let valid = true;
-    const name = nameInput.value.trim();
-    const phone = phoneInput.value.trim();
-    const message = messageInput.value.trim();
-    if (name.length < 2) {
+    if (name.value.trim().length < 2) {
       setFieldError('wishName', 'wishNameError', 'Enter your name.');
       valid = false;
     } else setFieldError('wishName', 'wishNameError', '');
-    if (!isValidPhone(phone)) {
+    if (!isValidPhone(phone.value)) {
       setFieldError('wishPhone', 'wishPhoneError', 'Enter a valid phone number.');
       valid = false;
     } else setFieldError('wishPhone', 'wishPhoneError', '');
-    if (!message) {
+    if (message.value.trim().length < 1) {
       setFieldError('wishMessage', 'wishMessageError', 'Write a birthday message.');
       valid = false;
     } else setFieldError('wishMessage', 'wishMessageError', '');
     if (!valid) return;
 
-    submitBtn.classList.add('is-loading');
-    submitBtn.disabled = true;
+    setButtonLoading(button, true);
     try {
       await apiRequest('/api/wish', {
         method: 'POST',
-        body: JSON.stringify({ name, phone: normalizePhone(phone), message }),
-        timeoutMs: 2000,
+        body: JSON.stringify({
+          name: name.value.trim(),
+          phone: normalizePhone(phone.value),
+          message: message.value.trim(),
+        }),
       });
-      celebrateSuccess();
       form.reset();
-    } catch (err) {
-      const message = err?.name === 'AbortError'
-        ? 'Your wish could not be confirmed. Please try again shortly.'
-        : describeRequestError(err);
-      showToast('failed', message);
+      celebrateSuccess('Your birthday wish was sent successfully.');
+    } catch (error) {
+      showToast('failed', error.name === 'AbortError' ? 'The request timed out. Please try again.' : error.message);
     } finally {
-      submitBtn.classList.remove('is-loading');
-      if (Date.now() >= new Date(CONFIG.submissionCutoffISO).getTime()) {
-        setSubmissionClosed();
-      } else {
-        submitBtn.disabled = false;
+      setButtonLoading(button, false);
+    }
+  });
+}
+
+function initGiftForm() {
+  const form = $('#giftForm');
+  if (!form) return;
+  const amount = $('#giftAmount');
+  const phone = $('#giftPhone');
+  const button = $('#giftSubmitBtn');
+  const status = $('#paymentStatus');
+  const statusText = $('#paymentText');
+  const chips = $$('.amount-chip');
+  let activeReference = null;
+
+  chips.forEach((chip) => chip.addEventListener('click', () => {
+    chips.forEach((item) => item.classList.remove('is-selected'));
+    chip.classList.add('is-selected');
+    amount.value = chip.dataset.amount;
+  }));
+
+  function paymentStatus(state, message) {
+    if (!status || !statusText) return;
+    status.classList.remove('state-success', 'state-failed', 'state-pending');
+    status.classList.add('is-visible');
+    if (state) status.classList.add(`state-${state}`);
+    statusText.textContent = message;
+  }
+
+  async function poll(reference) {
+    activeReference = reference;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const response = await apiRequest(`/api/payment-status/${encodeURIComponent(reference)}`, { timeoutMs: 8000 });
+        const data = response?.data || {};
+        const state = String(data.status ?? data.payment_status ?? '').toLowerCase();
+        if (['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'].includes(state)) {
+          localStorage.removeItem(PENDING_PAYMENT_KEY);
+          paymentStatus('success', 'Gift payment confirmed. Thank you!');
+          celebrateSuccess('Your gift was sent successfully.');
+          return;
+        }
+        if (['failed', 'cancelled', 'canceled', 'declined', 'error'].includes(state)) {
+          localStorage.removeItem(PENDING_PAYMENT_KEY);
+          paymentStatus('failed', 'Payment was not completed. You can try again.');
+          return;
+        }
+      } catch (_) {
+        // Keep polling; payment providers can briefly be unavailable.
       }
+      paymentStatus('pending', 'M-Pesa prompt sent. Approve it on your phone...');
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    paymentStatus('pending', 'Payment is still processing. Please check again shortly.');
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const numericAmount = Number(amount.value);
+    let valid = true;
+    if (!Number.isFinite(numericAmount) || numericAmount < 10) {
+      setFieldError('giftAmount', 'giftAmountError', 'Enter an amount of at least KES 10.');
+      valid = false;
+    } else setFieldError('giftAmount', 'giftAmountError', '');
+    if (!isValidPhone(phone.value)) {
+      setFieldError('giftPhone', 'giftPhoneError', 'Enter a valid M-Pesa phone number.');
+      valid = false;
+    } else setFieldError('giftPhone', 'giftPhoneError', '');
+    if (!valid) return;
+
+    const confirmation = $('#paymentConfirmation');
+    const confirmationAmount = $('#confirmationAmount');
+    if (confirmationAmount) confirmationAmount.textContent = `KES ${numericAmount.toLocaleString('en-KE')}`;
+    if (confirmation) confirmation.hidden = false;
+    const proceed = confirmation ? await new Promise((resolve) => {
+      const yes = $('#confirmationProceed');
+      const no = $('#confirmationCancel');
+      const close = $('#confirmationClose');
+      const finish = (value) => {
+        confirmation.hidden = true;
+        yes?.removeEventListener('click', onYes);
+        no?.removeEventListener('click', onNo);
+        close?.removeEventListener('click', onNo);
+        resolve(value);
+      };
+      const onYes = () => finish(true);
+      const onNo = () => finish(false);
+      yes?.addEventListener('click', onYes);
+      no?.addEventListener('click', onNo);
+      close?.addEventListener('click', onNo);
+    }) : true;
+    if (!proceed) return;
+
+    setButtonLoading(button, true);
+    paymentStatus('pending', 'Preparing your M-Pesa payment...');
+    try {
+      const response = await apiRequest('/api/payment', {
+        method: 'POST',
+        timeoutMs: 30000,
+        body: JSON.stringify({ amount: numericAmount, phone: normalizePhone(phone.value) }),
+      });
+      const reference = response?.data?.reference || response?.reference || response?.data?.transaction_id;
+      if (!reference) {
+        celebrateSuccess('Your gift request was received.');
+      } else {
+        localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({ reference, amount: numericAmount }));
+        await poll(reference);
+      }
+      form.reset();
+      chips.forEach((chip) => chip.classList.remove('is-selected'));
+    } catch (error) {
+      paymentStatus('failed', '');
+      showToast('failed', error.name === 'AbortError' ? 'The payment request timed out. Please try again.' : error.message);
+    } finally {
+      setButtonLoading(button, false);
     }
   });
+
+  const pending = JSON.parse(localStorage.getItem(PENDING_PAYMENT_KEY) || 'null');
+  if (pending?.reference) poll(pending.reference);
 }
 
-// Rotates the "waiting for confirmation" message as polling goes on, so a
-// visitor sees continuous signs of progress during what can legitimately be
-// up to a minute of waiting for an M-Pesa STK push to be answered, instead
-// of one static line that makes the whole thing look stuck.
-function waitingMessageFor(attempts) {
-  if (attempts < 3) return 'M-Pesa prompt sent. Waiting for your PIN confirmation...';
-  if (attempts < 7) return 'Still waiting. Check your phone for the M-Pesa prompt.';
-  if (attempts < 13) return 'This can take a little longer sometimes. Hang tight.';
-  return 'Waiting for PayHero to confirm your M-Pesa payment...';
-}
-
-// Tracks the transaction currently being polled so the manual "Check again"
-// button can re-check it on demand after the automatic window gives up.
-let lastPolledTransactionId = null;
-
-// Single source of truth for interpreting a /api/payment-status response.
-// Used by both the automatic poller and the manual "Check again" button so
-// their logic can never drift apart the way it did here before.
-//
-// Failure is checked FIRST and always wins. A "finalized" transaction with
-// an unrecognized status is surfaced as pending (not success) - "finalized"
-// only means the backend is done processing, not that it succeeded.
-function interpretPaymentStatus(res, pollLabel) {
-  const statusData = res?.data || {};
-  const rawStatus = statusData.status
-    ?? statusData.Status
-    ?? statusData.payment_status
-    ?? statusData.PaymentStatus
-    ?? statusData.provider_status;
-  const status = String(rawStatus ?? '').toLowerCase().trim();
-  const reason = String(statusData.reason ?? '').toLowerCase().trim();
-  if (pollLabel) console.log(`[${pollLabel}] Raw Status: "${rawStatus}", Normalized: "${status}"`);
-
-  const successStates = ['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'];
-  const failedStates = ['failed', 'cancelled', 'canceled', 'declined', 'error'];
-
-  if (['cancelled', 'canceled'].includes(status) || ['cancelled', 'canceled'].includes(reason)) return 'cancelled';
-  if (failedStates.includes(status)) return 'failed';
-  if (successStates.includes(status)) return 'success';
-
-  const finalizedAt = res?.data?.finalized_at;
-  const hasBeenFinalized = finalizedAt !== null && finalizedAt !== undefined;
-  if (hasBeenFinalized) return 'unrecognized-finalized';
-
-  return 'pending';
-}
-
-async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
-  // Show the waiting state for three seconds, then continue checking quietly
-  // so a late success or cancellation still reaches the user immediately.
-  const ADVICE_AFTER_ATTEMPTS = 6;
-  const MAX_ATTEMPTS = 60;
-  const INTERVAL_MS = 500;
-  lastPolledTransactionId = transactionId;
-
-  if (attempts >= MAX_ATTEMPTS) {
-    // Genuinely unknown at this point — NOT a failure. The payment may still
-    // complete on M-Pesa's side; we just stopped auto-checking. Let the
-    // visitor manually check again instead of telling them it failed.
-    showPaymentStatus('pending', 'No final response yet. Tap Check again if you approved the prompt, or retry if you cancelled it.');
-    showToast('info', 'The prompt was not confirmed within three seconds. Check again or retry your gift.');
-    return;
-  }
-
-  if (!quiet && attempts < ADVICE_AFTER_ATTEMPTS) {
-    showPaymentStatus('waiting', waitingMessageFor(attempts));
-  } else if (!quiet) {
-    showPaymentStatus('pending', 'No final response yet. You can check again or wait for the result.');
-    showToast('info', 'We are still checking quietly. You can check again later.');
-    quiet = true;
-  }
-
-  const pollLabel = `Payment Status Poll #${attempts + 1}`;
-  try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(transactionId)}`, { timeoutMs: 4000 });
-    console.log(`[${pollLabel}] Response:`, res);
-
-    const outcome = interpretPaymentStatus(res, pollLabel);
-
-    if (outcome === 'failed') {
-      console.log(`❌ [${pollLabel}] FAILED`);
-      clearPendingPayment(transactionId);
-      showToast('failed', `Payment failed for ${transactionId}. Please try again.`);
-      trackEvent('gift_failed');
-      return;
-    }
-    if (outcome === 'cancelled') {
-      console.log(`↩️ [${pollLabel}] CANCELLED`);
-      clearPendingPayment(transactionId);
-      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
-      trackEvent('gift_cancelled');
-      return;
-    }
-    if (outcome === 'success') {
-      console.log(`✅ [${pollLabel}] SUCCESS`);
-      clearPendingPayment(transactionId);
-      celebrateSuccess();
-      trackEvent('gift_success');
-      return;
-    }
-    if (outcome === 'unrecognized-finalized') {
-      console.log(`⚠️ [${pollLabel}] Finalized with an unrecognized status - treating as pending, not success`);
-      showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
-      return;
-    }
-
-    console.log(`⏳ [${pollLabel}] Still pending, will retry...`);
-    await new Promise(r => setTimeout(r, INTERVAL_MS));
-    return pollPaymentStatus(transactionId, attempts + 1, quiet);
-  } catch (err) {
-    console.log(`[${pollLabel}] Error (will retry):`, err.message);
-    await new Promise(r => setTimeout(r, INTERVAL_MS));
-    return pollPaymentStatus(transactionId, attempts + 1, quiet);
-  }
-}
-
-// One-off check for the manual "Check again" button — does not restart the
-// full automatic polling loop, just asks once and reflects whatever comes
-// back, including "still pending" so the visitor can check again later.
-async function recheckPaymentStatus() {
-  if (!lastPolledTransactionId) return;
-  const recheckBtn = $('#paymentRecheck');
-  recheckBtn.disabled = true;
-  showPaymentStatus('waiting', 'Checking...');
-
-  try {
-    const res = await apiRequest(`/api/payment-status/${encodeURIComponent(lastPolledTransactionId)}`, { timeoutMs: 4000 });
-    const outcome = interpretPaymentStatus(res);
-
-    if (outcome === 'success') {
-      clearPendingPayment(lastPolledTransactionId);
-      celebrateSuccess();
-      trackEvent('gift_success');
-    } else if (outcome === 'cancelled') {
-      clearPendingPayment(lastPolledTransactionId);
-      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
-      trackEvent('gift_cancelled');
-    } else if (outcome === 'failed') {
-      clearPendingPayment(lastPolledTransactionId);
-      showToast('failed', `Payment failed for ${lastPolledTransactionId}. Please try again.`);
-      trackEvent('gift_failed');
-    } else if (outcome === 'unrecognized-finalized') {
-      showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
-    } else {
-      showPaymentStatus('pending', "Still processing. There is no confirmation yet. You can check again in a moment.");
-    }
-  } catch {
-    showPaymentStatus('pending', "Couldn't check just now. Please try again in a moment.");
-  } finally {
-    recheckBtn.disabled = false;
-  }
-}
-
-function showPaymentStatus(state, message) {
-  const statusEl = $('#paymentStatus');
-  const textEl = $('#paymentText');
-  const iconEl = $('#paymentIcon');
-
-  clearTimeout(showPaymentStatus.dismissTimer);
-  statusEl.classList.remove('state-success', 'state-failed', 'state-pending', 'can-close', 'can-recheck');
-  statusEl.classList.add('is-visible');
-  textEl.textContent = message;
-
-  if (state === 'success') {
-    statusEl.classList.add('state-success', 'can-close');
-    iconEl.textContent = '✓';
-  } else if (state === 'failed') {
-    statusEl.classList.add('state-failed', 'can-close');
-    iconEl.textContent = '✕';
-  } else if (state === 'pending') {
-    statusEl.classList.add('state-pending', 'can-close', 'can-recheck');
-    iconEl.textContent = '⏳';
-  }
-
-  if (state === 'success' || state === 'failed') {
-    showPaymentStatus.dismissTimer = setTimeout(() => {
-      statusEl.classList.remove('is-visible');
-    }, 3200);
-  }
-}
-
-function initPaymentRecheck() {
-  $('#paymentRecheck')?.addEventListener('click', recheckPaymentStatus);
-}
-
-function initPaymentStatusClose() {
-  $('#paymentClose')?.addEventListener('click', () => {
-    clearTimeout(showPaymentStatus.dismissTimer);
-    $('#paymentStatus').classList.remove('is-visible');
-  });
-}
-
-/* ==========================================================================
-   CONFETTI
-   ========================================================================== */
-function launchConfetti(count = 40) {
-  if (prefersReducedMotion) return;
-  const root = $('#confettiRoot');
-  const colors = ['#00E676', '#FFB020', '#FF8800', '#FFFFFF', '#6EE7B7'];
-
-  for (let i = 0; i < count; i++) {
-    const piece = document.createElement('div');
-    piece.className = 'confetti-piece';
-    const size = 6 + Math.random() * 8;
-    piece.style.left = `${Math.random() * 100}%`;
-    piece.style.width = `${size}px`;
-    piece.style.height = `${size * 0.4}px`;
-    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-    piece.style.animationDuration = `${2.5 + Math.random() * 2}s`;
-    piece.style.animationDelay = `${Math.random() * 0.4}s`;
-    root.appendChild(piece);
-    setTimeout(() => piece.remove(), 5000);
-  }
-}
-
-function launchCelebrationEffects(count = 22) {
-  if (prefersReducedMotion) return;
-  const root = $('#celebrationRoot');
-  if (!root) return;
-
-  const variants = ['balloon', 'flower', 'gift'];
-
-  for (let i = 0; i < count; i++) {
-    const particle = document.createElement('div');
-    const variant = variants[Math.floor(Math.random() * variants.length)];
-    particle.className = `celebration-particle celebration-${variant}`;
-    const size = 18 + Math.random() * 22;
-    particle.style.left = `${Math.random() * 100}%`;
-    particle.style.width = `${size}px`;
-    particle.style.height = `${size}px`;
-    particle.style.opacity = `${0.8 + Math.random() * 0.2}`;
-    particle.style.animationDuration = `${3.2 + Math.random() * 1.8}s`;
-    particle.style.animationDelay = `${Math.random() * 0.6}s`;
-    particle.style.transform = `translateX(${(-14 + Math.random() * 28)}px)`;
-    root.appendChild(particle);
-    setTimeout(() => particle.remove(), 7000);
-  }
-}
-
-function celebrateSuccess() {
-  showToast('success', 'Success! Thank you for celebrating.');
-  launchConfetti(48);
-  launchCelebrationEffects(18);
-}
-
-/* ==========================================================================
-   HERO NAME + PERSONALIZATION
-   ========================================================================== */
-function applyPersonalization() {
-  const nameEl = $('#celebrantName');
-  if (nameEl) nameEl.textContent = CONFIG.celebrantName;
-  document.title = `Happy Birthday, ${CONFIG.celebrantName}`;
+function initCountdown() {
+  const caption = $('#countdownCaption');
+  const target = new Date('2026-12-31T23:59:59+03:00').getTime();
+  const fields = { days: $('#cd-days'), hours: $('#cd-hours'), minutes: $('#cd-minutes'), seconds: $('#cd-seconds') };
+  const update = () => {
+    const diff = Math.max(0, target - Date.now());
+    const values = [Math.floor(diff / 86400000), Math.floor(diff / 3600000) % 24, Math.floor(diff / 60000) % 60, Math.floor(diff / 1000) % 60];
+    ['days', 'hours', 'minutes', 'seconds'].forEach((key, index) => { if (fields[key]) fields[key].textContent = String(values[index]).padStart(2, '0'); });
+    if (caption) caption.textContent = 'The celebration is open — send a wish or gift anytime.';
+  };
+  update();
+  setInterval(update, 1000);
 }
 
 function initFooterLinks() {
   const container = $('#footerLinks');
   if (!container) return;
-  CONFIG.socialLinks.forEach(link => {
-    const a = document.createElement('a');
-    a.href = link.href;
-    a.className = 'footer-link';
-    a.textContent = link.label;
-    a.setAttribute('aria-label', link.label);
-    if (link.external) {
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-    }
-    container.appendChild(a);
+  CONFIG.socialLinks.forEach((link) => {
+    const anchor = document.createElement('a');
+    anchor.className = 'footer-link';
+    anchor.href = link.href;
+    anchor.textContent = link.label;
+    if (link.external) { anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; }
+    container.appendChild(anchor);
   });
 }
 
-/* ==========================================================================
-   AUDIO FALLBACK
-   If the configured track fails to load (e.g. the file hasn't been added
-   yet), disable the music player instead of leaving a broken control.
-   ========================================================================== */
-function initAudioFallback() {
-  const audio = $('#bgMusic');
-  const player = $('#musicPlayer');
-  if (!audio || !player) return;
-  audio.addEventListener('error', () => {
-    player.setAttribute('title', 'Music track not found. Add audio/happy-birthday.mp3.');
-    player.style.opacity = '0.4';
-    player.style.pointerEvents = 'none';
-  }, true);
-}
-
-/* ==========================================================================
-   BACKEND WARM-UP
-   Render's free tier spins the backend down after inactivity. Ping it as
-   soon as the page loads (well before anyone finishes filling out a form)
-   so the real submission doesn't eat a 30–50s cold-start delay.
-   ========================================================================== */
-let backendWarmed = false;
-function warmUpBackend() {
-  if (backendWarmed) return;
-  backendWarmed = true;
-  apiRequest('/api/health').catch(() => {
-    // Ignore — this is best-effort. If it fails, the real request will
-    // still work, just with the usual cold-start wait built into its timeout.
-    backendWarmed = false; // allow a retry on the next trigger
+function initToast() {
+  $('#siteToastClose')?.addEventListener('click', () => {
+    const toast = $('#siteToast');
+    toast?.classList.remove('is-visible');
+    if (toast) toast.hidden = true;
   });
 }
 
-async function syncAvailability() {
-  try {
-    const response = await apiRequest('/api/availability', { timeoutMs: 3000 });
-    const cutoff = response?.data?.cutoff_iso;
-    if (cutoff) CONFIG.submissionCutoffISO = cutoff;
-  } catch {
-    // Keep the static fallback if the backend is waking up or unavailable.
-  }
-}
-
-/* ==========================================================================
-   INIT
-   ========================================================================== */
-document.addEventListener('DOMContentLoaded', async () => {
-  await syncAvailability();
-  applyPersonalization();
-  initFooterLinks();
-  initLoader();
-  initPetals();
-  initSparkles();
-  initFloatingHearts();
-  initMusicPlayer();
-  initAudioFallback();
-  initScrollUI();
-  initCountdown();
-  initMagneticButtons();
-  initGiftForm();
+document.addEventListener('DOMContentLoaded', () => {
+  const name = $('#celebrantName');
+  if (name) name.textContent = CONFIG.celebrantName;
+  document.title = `Happy Birthday, ${CONFIG.celebrantName}`;
   initWishForm();
-  initPaymentConfirmation();
-  initPaymentStatusClose();
-  initPaymentRecheck();
+  initGiftForm();
+  initCountdown();
+  initFooterLinks();
   initToast();
-  warmUpBackend();
-  trackEvent('page_view');
 });
-

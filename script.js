@@ -898,6 +898,15 @@ function interpretPaymentStatus(res, pollLabel) {
   return 'pending';
 }
 
+function paymentStatusMessage(res, outcome) {
+  const serverMessage = String(res?.data?.status_message || '').trim();
+  if (serverMessage) return serverMessage;
+  if (outcome === 'success') return 'Payment confirmed successfully. Thank you for your gift!';
+  if (outcome === 'cancelled') return 'Payment cancelled. No money was sent.';
+  if (outcome === 'failed') return 'Payment failed. No gift payment was confirmed.';
+  return 'Payment prompt sent. Waiting for M-Pesa confirmation.';
+}
+
 async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
   // Show the waiting state for three seconds, then continue checking quietly
   // so a late success or cancellation still reaches the user immediately.
@@ -933,27 +942,27 @@ async function pollPaymentStatus(transactionId, attempts = 0, quiet = false) {
     if (outcome === 'failed') {
       console.log(`❌ [${pollLabel}] FAILED`);
       clearPendingPayment(transactionId);
-      showToast('failed', `Payment failed for ${transactionId}. Please try again.`);
+      showToast('failed', paymentStatusMessage(res, outcome));
       trackEvent('gift_failed');
       return;
     }
     if (outcome === 'cancelled') {
       console.log(`↩️ [${pollLabel}] CANCELLED`);
       clearPendingPayment(transactionId);
-      showToast('failed', 'Payment cancelled. No money was sent. You can try again anytime.');
+      showToast('failed', paymentStatusMessage(res, outcome));
       trackEvent('gift_cancelled');
       return;
     }
     if (outcome === 'success') {
       console.log(`✅ [${pollLabel}] SUCCESS`);
       clearPendingPayment(transactionId);
-      celebrateSuccess();
+      celebrateSuccess(paymentStatusMessage(res, outcome));
       trackEvent('gift_success');
       return;
     }
     if (outcome === 'unrecognized-finalized') {
       console.log(`⚠️ [${pollLabel}] Finalized with an unrecognized status - treating as pending, not success`);
-      showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
+      showPaymentStatus('pending', paymentStatusMessage(res, outcome));
       return;
     }
 
@@ -982,7 +991,7 @@ async function recheckPaymentStatus() {
 
     if (outcome === 'success') {
       clearPendingPayment(lastPolledTransactionId);
-      celebrateSuccess();
+      celebrateSuccess(paymentStatusMessage(res, outcome));
       trackEvent('gift_success');
     } else if (outcome === 'cancelled') {
       clearPendingPayment(lastPolledTransactionId);
@@ -995,7 +1004,7 @@ async function recheckPaymentStatus() {
     } else if (outcome === 'unrecognized-finalized') {
       showPaymentStatus('pending', "Your payment has finished processing, but we couldn't confirm the result automatically. Tap \u201cCheck again\u201d in a moment, or reach out if it doesn't resolve.");
     } else {
-      showPaymentStatus('pending', "Still processing. There is no confirmation yet. You can check again in a moment.");
+      showPaymentStatus('pending', paymentStatusMessage(res, outcome));
     }
   } catch {
     showPaymentStatus('pending', "Couldn't check just now. Please try again in a moment.");
@@ -1090,8 +1099,8 @@ function launchCelebrationEffects(count = 22) {
   }
 }
 
-function celebrateSuccess() {
-  showToast('success', 'Success! Thank you for celebrating.');
+function celebrateSuccess(message = 'Payment confirmed successfully. Thank you for your gift!') {
+  showToast('success', message);
   launchConfetti(48);
   launchCelebrationEffects(18);
 }

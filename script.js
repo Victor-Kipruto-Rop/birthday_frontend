@@ -44,7 +44,7 @@ async function apiRequest(path, options = {}) {
       ...fetchOptions,
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    if (!response.ok || data?.success === false) {
       throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
     }
     return data;
@@ -73,6 +73,7 @@ function setFieldError(fieldId, errorId, message) {
 }
 
 function setButtonLoading(button, loading) {
+  if (!button) return;
   button.classList.toggle('is-loading', loading);
   button.disabled = loading;
 }
@@ -115,7 +116,7 @@ function initWishForm() {
       setFieldError('wishMessage', 'wishMessageError', 'Write a birthday message.');
       valid = false;
     } else setFieldError('wishMessage', 'wishMessageError', '');
-    if (!valid) return;
+    if (!valid || button.disabled) return;
 
     setButtonLoading(button, true);
     try {
@@ -145,8 +146,10 @@ function initGiftForm() {
   const button = $('#giftSubmitBtn');
   const status = $('#paymentStatus');
   const statusText = $('#paymentText');
+  const recheckButton = $('#paymentRecheck');
   const chips = $$('.amount-chip');
   let activeReference = null;
+  let polling = false;
 
   chips.forEach((chip) => chip.addEventListener('click', () => {
     chips.forEach((item) => item.classList.remove('is-selected'));
@@ -162,35 +165,57 @@ function initGiftForm() {
     statusText.textContent = message;
   }
 
-  async function poll(reference) {
-    activeReference = reference;
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      try {
-        const response = await apiRequest(`/api/payment-status/${encodeURIComponent(reference)}`, { timeoutMs: 8000 });
-        const data = response?.data || {};
-        const state = String(data.status ?? data.payment_status ?? '').toLowerCase();
-        if (['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'].includes(state)) {
-          localStorage.removeItem(PENDING_PAYMENT_KEY);
-          paymentStatus('success', 'Gift payment confirmed. Thank you!');
-          celebrateSuccess('Your gift was sent successfully.');
-          return;
-        }
-        if (['failed', 'cancelled', 'canceled', 'declined', 'error'].includes(state)) {
-          localStorage.removeItem(PENDING_PAYMENT_KEY);
-          paymentStatus('failed', 'Payment was not completed. You can try again.');
-          return;
-        }
-      } catch (_) {
-        // Keep polling; payment providers can briefly be unavailable.
-      }
-      paymentStatus('pending', 'M-Pesa prompt sent. Approve it on your phone...');
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
-    paymentStatus('pending', 'Payment is still processing. Please check again shortly.');
+  function getPaymentState(data) {
+    return String(
+      data?.status ?? data?.Status ?? data?.payment_status ?? data?.PaymentStatus ?? data?.provider_status ?? '',
+    ).toLowerCase().trim();
   }
+
+  async function poll(reference, maxAttempts = 60) {
+    if (!reference || polling) return;
+    activeReference = reference;
+    polling = true;
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          const response = await apiRequest(`/api/payment-status/${encodeURIComponent(reference)}`, { timeoutMs: 8000 });
+          const state = getPaymentState(response?.data || response);
+          if (['success', 'successful', 'completed', 'complete', 'paid', '0', 'true'].includes(state)) {
+            localStorage.removeItem(PENDING_PAYMENT_KEY);
+            paymentStatus('success', 'Gift payment confirmed. Thank you!');
+            celebrateSuccess('Your gift was sent successfully.');
+            return true;
+          }
+          if (['failed', 'cancelled', 'canceled', 'declined', 'error'].includes(state)) {
+            localStorage.removeItem(PENDING_PAYMENT_KEY);
+            paymentStatus('failed', 'Payment was not completed. You can try again.');
+            return false;
+          }
+        } catch (_) {
+          // Continue polling because payment-provider callbacks can be delayed.
+        }
+        paymentStatus('pending', 'M-Pesa prompt sent. Approve it on your phone...');
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      paymentStatus('pending', 'Payment is still processing. Tap “Check again” shortly.');
+      return false;
+    } finally {
+      polling = false;
+    }
+  }
+
+  async function recheckPayment() {
+    if (!activeReference || polling) return;
+    recheckButton.disabled = true;
+    await poll(activeReference, 1);
+    recheckButton.disabled = false;
+  }
+
+  recheckButton?.addEventListener('click', recheckPayment);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (button.disabled) return;
     const numericAmount = Number(amount.value);
     let valid = true;
     if (!Number.isFinite(numericAmount) || numericAmount < 10) {
@@ -211,18 +236,25 @@ function initGiftForm() {
       const yes = $('#confirmationProceed');
       const no = $('#confirmationCancel');
       const close = $('#confirmationClose');
+      const backdrop = confirmation;
       const finish = (value) => {
         confirmation.hidden = true;
         yes?.removeEventListener('click', onYes);
         no?.removeEventListener('click', onNo);
         close?.removeEventListener('click', onNo);
+        backdrop.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onEscape);
         resolve(value);
       };
       const onYes = () => finish(true);
       const onNo = () => finish(false);
+      const onBackdrop = (clickEvent) => { if (clickEvent.target === backdrop) onNo(); };
+      const onEscape = (keyboardEvent) => { if (keyboardEvent.key === 'Escape') onNo(); };
       yes?.addEventListener('click', onYes);
       no?.addEventListener('click', onNo);
       close?.addEventListener('click', onNo);
+      backdrop.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onEscape);
     }) : true;
     if (!proceed) return;
 
@@ -236,13 +268,17 @@ function initGiftForm() {
       });
       const reference = response?.data?.reference || response?.reference || response?.data?.transaction_id;
       if (!reference) {
+        form.reset();
+        chips.forEach((chip) => chip.classList.remove('is-selected'));
         celebrateSuccess('Your gift request was received.');
       } else {
         localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({ reference, amount: numericAmount }));
-        await poll(reference);
+        const completed = await poll(reference);
+        if (completed) {
+          form.reset();
+          chips.forEach((chip) => chip.classList.remove('is-selected'));
+        }
       }
-      form.reset();
-      chips.forEach((chip) => chip.classList.remove('is-selected'));
     } catch (error) {
       paymentStatus('failed', '');
       showToast('failed', error.name === 'AbortError' ? 'The payment request timed out. Please try again.' : error.message);
@@ -251,22 +287,19 @@ function initGiftForm() {
     }
   });
 
-  const pending = JSON.parse(localStorage.getItem(PENDING_PAYMENT_KEY) || 'null');
+  let pending = null;
+  try { pending = JSON.parse(localStorage.getItem(PENDING_PAYMENT_KEY) || 'null'); } catch (_) { localStorage.removeItem(PENDING_PAYMENT_KEY); }
   if (pending?.reference) poll(pending.reference);
 }
 
 function initCountdown() {
   const caption = $('#countdownCaption');
-  const target = new Date('2026-12-31T23:59:59+03:00').getTime();
   const fields = { days: $('#cd-days'), hours: $('#cd-hours'), minutes: $('#cd-minutes'), seconds: $('#cd-seconds') };
   const update = () => {
-    const diff = Math.max(0, target - Date.now());
-    const values = [Math.floor(diff / 86400000), Math.floor(diff / 3600000) % 24, Math.floor(diff / 60000) % 60, Math.floor(diff / 1000) % 60];
-    ['days', 'hours', 'minutes', 'seconds'].forEach((key, index) => { if (fields[key]) fields[key].textContent = String(values[index]).padStart(2, '0'); });
+    ['days', 'hours', 'minutes', 'seconds'].forEach((key) => { if (fields[key]) fields[key].textContent = '00'; });
     if (caption) caption.textContent = 'The celebration is open — send a wish or gift anytime.';
   };
   update();
-  setInterval(update, 1000);
 }
 
 function initFooterLinks() {

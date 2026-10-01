@@ -1,7 +1,7 @@
 'use strict';
 
 const CONFIG = {
-  celebrantName: 'Rop',
+  celebrantName: 'Limo',
   apiBaseUrl: 'https://birthday-backend-s1b7.onrender.com',
   analyticsEndpoint: null,
   socialLinks: [

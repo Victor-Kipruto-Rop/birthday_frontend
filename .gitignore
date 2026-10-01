@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+*.log
+
+# Never commit local secrets or local-only config.
+.env
+.env.*
+!.env.example
+
+# Local-only artifacts that must not be published to the static host.
+data/
+logs/
+.vercel/
